@@ -310,3 +310,16 @@ class BlueIrisApi:
             "button" : preset_value
         }
         await self.async_verified_post(request_data)
+
+    async def set_macro_value(self, macro_id, macro_value):
+        _LOGGER.info(f"Setting macro id {macro_id} to value {macro_value}")
+        macro_data = {
+            "number": macro_id,
+            "value": macro_value,
+        }
+        request_data = {
+            "cmd": "status",
+            "session": self.session_id,
+            "macro" : macro_data
+        }
+        await self.async_verified_post(request_data)
