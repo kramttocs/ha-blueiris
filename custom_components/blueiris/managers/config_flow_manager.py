@@ -199,7 +199,7 @@ class ConfigFlowManager:
 
         fields[vol.Optional(CONF_CLEAR_CREDENTIALS, default=False)] = bool
 
-        fields[vol.Optional(CONF_GENERATE_CONFIG_FILES, default=False)] = bool
+        # fields[vol.Optional(CONF_GENERATE_CONFIG_FILES, default=False)] = bool
 
         fields[
             vol.Optional(CONF_STREAM_TYPE, default=config_data.stream_type)

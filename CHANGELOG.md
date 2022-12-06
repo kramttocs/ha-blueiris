@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.16
+
+- Removed Generate Config Files from UI (was no longer functional)
+
+## 1.0.15
+
+- Remove unused entries from the config flow that aren't present in Blue Iris
+- Allow port 80 during setup
+
+## 1.0.14
+
+- Ensure entity update is scheduled with event loop
+
 ## 1.0.13
 
 - Device and Entity registry - `async_get_registry` is deprecated, change to `async_get` [\#170](https://github.com/elad-bar/ha-blueiris/issues/170)
