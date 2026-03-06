@@ -1,0 +1,40 @@
+trigger_camera:
+  name: Trigger Camera
+  description: Triggers the selected camera in Blue Iris
+  target:
+    entity:
+      integration: blueiris
+      domain: camera
+
+move_to_preset:
+  name: Move to Preset
+  description: Moves the selected camera to the specified preset
+  target:
+    entity:
+      integration: blueiris
+      domain: camera
+  fields:
+    preset:
+      name: Preset
+      description: Desired preset number
+      required: true
+      default: 1
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 40
+          step: 1
+          mode: box
+          
+reload:
+  name: Reload
+  description: Reload one Blue Iris config entry, or all entries if no entry_id is provided.
+  fields:
+    entry_id:
+      name: Config entry ID
+      description: The config entry ID to reload. If omitted, all Blue Iris entries are reloaded.
+      example: 01KJNTBTYN82YCCX7WB5J2J3CT
+      required: false
+      selector:
+        text:

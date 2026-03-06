@@ -1,0 +1,85 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Blue Iris",
+        "description": "Set up your Blue Iris Server details.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "username": "Username",
+          "password": "Password",
+          "ssl": "Use SSL",
+          "verify_ssl": "Verify SSL certificate"
+        }
+      },
+      "select": {
+        "title": "Select Options",
+        "description": "Choose additional integration settings.",
+        "data": {
+          "log_level": "Log level",
+          "stream_type": "Stream type",
+          "support_stream": "Enable camera streaming",
+          "hold_profile_changes": "Hold profile changes",
+          "allowed_camera": "Allowed cameras",
+          "allowed_profile": "Allowed profiles",
+          "allowed_schedule": "Allowed schedules",
+          "allowed_motion_sensor": "Motion sensors",
+          "allowed_audio_sensor": "Audio sensors",
+          "allowed_connectivity_sensor": "Connectivity sensors",
+          "allowed_dio_sensor": "DIO sensors",
+          "allowed_external_sensor": "External sensors"
+        }
+      },
+      "ai_labels_setup": {
+        "title": "AI Label Mapping",
+        "description": "{help}",
+        "data": {
+          "ai_person_labels": "Person labels",
+          "ai_vehicle_labels": "Vehicle labels",
+          "ai_animal_labels": "Animal labels"
+        }
+      }
+    },
+    "error": {
+      "already_configured": "Blue Iris is already configured.",
+      "cannot_connect": "Cannot connect.",
+      "invalid_auth": "Invalid authentication.",
+      "unknown": "Unexpected error."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Blue Iris options",
+        "description": "Adjust integration options and entity selections.",
+        "data": {
+          "log_level": "Log level",
+          "allowed_camera": "Allowed cameras",
+          "allowed_profile": "Profile switches",
+          "allowed_schedule": "Schedule switches",
+          "allowed_motion_sensor": "Motion sensors",
+          "allowed_audio_sensor": "Audio sensors",
+          "allowed_connectivity_sensor": "Connectivity sensors",
+          "allowed_dio_sensor": "DIO sensors",
+          "allowed_external_sensor": "External sensors",
+          "stream_type": "Stream type",
+          "support_stream": "Enable camera streaming",
+          "hold_profile_changes": "Hold profile changes"
+        }
+      },
+      "ai_labels": {
+        "title": "AI Label Mapping",
+        "description": "{help}",
+        "data": {
+          "ai_person_labels": "Person labels",
+          "ai_vehicle_labels": "Vehicle labels",
+          "ai_animal_labels": "Animal labels"
+        }
+      }
+    },
+    "error": {
+      "unknown": "Unexpected error."
+    }
+  }
+}

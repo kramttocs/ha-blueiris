@@ -1,0 +1,14 @@
+{
+  "domain": "blueiris",
+  "name": "Blue Iris NVR",
+  "after_dependencies": ["mqtt"],
+  "codeowners": ["@kramttocs"],
+  "config_flow": true,
+  "documentation": "https://github.com/kramttocs/ha-blueiris",
+  "integration_type": "hub",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/kramttocs/ha-blueiris/issues",
+  "loggers": ["custom_components.blueiris"],
+  "requirements": [],
+  "version": "2026.3.4"
+}
