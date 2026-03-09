@@ -65,6 +65,8 @@ SERVICE_TRIGGER_CAMERA: Final[str] = "trigger_camera"
 SERVICE_MOVE_TO_PRESET: Final[str] = "move_to_preset"
 SERVICE_RELOAD: Final[str] = "reload"
 SERVICE_RELOAD_ENTRY_ID: Final[str] = "entry_id"
+SERVICE_LATEST_EVENT_SNAPSHOT: Final[str] = "latest_event_snapshot"
+SERVICE_SNAPSHOT_FILENAME: Final[str] = "filename"
 
 ATTR_ADMIN_PROFILE: Final[str] = "Profile"
 ATTR_ADMIN_SCHEDULE: Final[str] = "Schedule"

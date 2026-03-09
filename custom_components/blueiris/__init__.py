@@ -4,14 +4,18 @@ from functools import partial
 
 import asyncio
 import logging
+from pathlib import Path
+from typing import Any
+from functools import partial
 
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
+from homeassistant.util import dt as dt_util
 
 from .coordinator import BlueIrisDataUpdateCoordinator
 from .helpers.device import server_device_name
@@ -27,11 +31,11 @@ from .helpers.const import (
     SERVICE_TRIGGER_CAMERA,
     SERVICE_RELOAD,
     SERVICE_RELOAD_ENTRY_ID,
+    SERVICE_LATEST_EVENT_SNAPSHOT,
+    SERVICE_SNAPSHOT_FILENAME,
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 TRIGGER_SCHEMA = vol.Schema({vol.Required("entity_id"): cv.entity_ids})
 PRESET_SCHEMA = vol.Schema(
@@ -41,6 +45,12 @@ PRESET_SCHEMA = vol.Schema(
     }
 )
 RELOAD_SCHEMA = vol.Schema({vol.Optional(SERVICE_RELOAD_ENTRY_ID): cv.string})
+LATEST_EVENT_SNAPSHOT_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entity_id"): vol.Any(cv.entity_id, [cv.entity_id]),
+        vol.Optional(SERVICE_SNAPSHOT_FILENAME): cv.string,
+    }
+)
 
 
 def _coordinator_and_camera_id_from_entity_id(
@@ -148,6 +158,92 @@ async def _async_handle_move_to_preset(hass: HomeAssistant, call: ServiceCall) -
     await _async_run_camera_action(hass, entity_ids, _action)
 
 
+
+
+def _latest_event_payload(
+    coordinator: BlueIrisDataUpdateCoordinator,
+    camera_id: str,
+    *,
+    filename: str | None = None,
+) -> dict[str, Any]:
+    """Build a response payload for the latest event snapshot service."""
+    data = coordinator.data
+    event = coordinator.get_last_event(camera_id)
+    camera = data.cameras.get(camera_id) if data else None
+
+    return {
+        "camera_id": camera_id,
+        "camera_name": camera.name if camera is not None else camera_id,
+        "event": event.state if event is not None else None,
+        "event_type": event.event_type if event is not None else None,
+        "event_time": event.last_detection if event is not None else None,
+        "snapshot_url": event.snapshot_url if event is not None else coordinator._still_image_url(camera_id),
+        "memo": event.memo if event is not None else None,
+        "labels": event.labels if event is not None else None,
+        "matched_labels": event.matched_labels if event is not None else None,
+        "stored_path": filename or (event.stored_path if event is not None else None),
+        "generated_at": dt_util.utcnow().isoformat(),
+    }
+
+
+async def _async_handle_latest_event_snapshot(
+    hass: HomeAssistant, call: ServiceCall
+) -> dict[str, Any]:
+    """Return latest event metadata and optionally save a current still image."""
+    entity_id = call.data.get("entity_id")
+    if entity_id is None:
+        entity_id = call.target.get("entity_id")
+
+    if isinstance(entity_id, list):
+        if len(entity_id) != 1:
+            raise ServiceValidationError("Exactly one entity_id is required")
+        entity_id = entity_id[0]
+
+    if not isinstance(entity_id, str):
+        raise ServiceValidationError(
+            "entity_id must be a single camera entity_id string"
+        )
+
+    coordinator, camera_id = _coordinator_and_camera_id_from_entity_id(
+        hass, entity_id
+    )
+
+    base_snapshot_dir = Path("/config/www/blueiris")
+
+    filename = call.data.get(SERVICE_SNAPSHOT_FILENAME)
+    if filename:
+        filename = Path(filename).name
+    else:
+        filename = f"{camera_id.lower()}_latest.jpg"
+
+    image = await coordinator.async_fetch_camera_snapshot(camera_id)
+    if image is None:
+        raise ServiceValidationError(
+            f"Unable to fetch snapshot for {entity_id}"
+        )
+
+    path = base_snapshot_dir / filename
+
+    # Ensure directory exists
+    await hass.async_add_executor_job(
+        partial(path.parent.mkdir, parents=True, exist_ok=True)
+    )
+
+    # Write snapshot
+    await hass.async_add_executor_job(path.write_bytes, image)
+
+    _LOGGER.debug("Saved Blue Iris snapshot for %s to %s", entity_id, path)
+    coordinator.set_last_event_stored_path(camera_id, str(path))
+
+    local_url = f"/local/blueiris/{filename}"
+
+    payload = _latest_event_payload(coordinator, camera_id, filename=filename)
+    payload["saved_filename"] = filename
+    payload["saved_path"] = str(path)
+    payload["local_snapshot_url"] = local_url
+
+    return payload
+
 async def async_setup(_hass: HomeAssistant, _config: dict) -> bool:
     """Set up via YAML (not used)."""
     return True
@@ -212,6 +308,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_RELOAD,
             partial(_async_handle_reload, hass),
             schema=RELOAD_SCHEMA,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_LATEST_EVENT_SNAPSHOT):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_LATEST_EVENT_SNAPSHOT,
+            partial(_async_handle_latest_event_snapshot, hass),
+            schema=LATEST_EVENT_SNAPSHOT_SCHEMA,
+            supports_response=SupportsResponse.OPTIONAL,
         )
 
     # Optionally rename integration to BI system name (only if still default).
