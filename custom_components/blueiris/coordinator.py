@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from json import JSONDecodeError
 from typing import Any
 
+import aiohttp
 from homeassistant.components import mqtt
 from homeassistant.components.mqtt import ReceiveMessage
 from homeassistant.config_entries import ConfigEntry
@@ -25,6 +26,7 @@ from homeassistant.const import (
     CONF_VERIFY_SSL,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -153,6 +155,21 @@ class MqttEventState:
 
 
 @dataclass(slots=True)
+class CameraLastEvent:
+    """High-level latest AI event tracked per camera."""
+
+    camera_id: str
+    event_type: str
+    state: str
+    last_detection: str
+    snapshot_url: str
+    memo: str | None = None
+    labels: list[str] | None = None
+    matched_labels: list[str] | None = None
+    stored_path: str | None = None
+
+
+@dataclass(slots=True)
 class BlueIrisData:
     """Coordinator snapshot containing API data, status, cameras, and MQTT state."""
     """Snapshot of Blue Iris state used by entities."""
@@ -165,6 +182,7 @@ class BlueIrisData:
     cameras: dict[str, CameraData]  # keyed by camera id
 
     mqtt: dict[str, MqttEventState]  # keyed by mqtt_key(...)
+    last_events: dict[str, CameraLastEvent]  # keyed by camera id
 
     base_url: str
     session_id: str | None
@@ -201,6 +219,7 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
         self.api = BlueIrisApi(hass, self._config)
 
         self._mqtt: dict[str, MqttEventState] = {}
+        self._last_events: dict[str, CameraLastEvent] = {}
 
         self._mqtt_unsub: Any | None = None
         self._mqtt_root = MQTT_ROOT_DEFAULT
@@ -287,6 +306,104 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
     ) -> None:
         k = mqtt_key(topic, category_key)
         self._set_mqtt(k, value=True, memo=memo, labels=labels_list, matched_labels=matched, ts=ts)
+
+
+    def _still_image_url(self, camera_id: str) -> str:
+        """Build the current still-image URL for a camera."""
+        session_id = self.api.session_id
+        base_url = self.api.base_url
+        if session_id:
+            return f"{base_url}/image/{camera_id}?session={session_id}"
+        return f"{base_url}/image/{camera_id}"
+
+    def get_last_event(self, camera_id: str) -> CameraLastEvent | None:
+        """Return the latest tracked AI event for a camera, if any."""
+        return self._last_events.get(camera_id)
+
+    def set_last_event_stored_path(self, camera_id: str, stored_path: str | None) -> None:
+        """Persist the most recent saved snapshot path for a camera event."""
+        event = self._last_events.get(camera_id)
+        if event is None:
+            return
+        event.stored_path = stored_path
+        if self.data is not None:
+            self.async_set_updated_data(replace(self.data, last_events=dict(self._last_events)))
+
+    def _record_last_motion_event(
+        self,
+        *,
+        camera_id: str,
+        memo: str,
+        labels_list: list[str],
+        combined: list[str],
+        person_matched: list[str],
+        vehicle_matched: list[str],
+        animal_matched: list[str],
+        ts: str,
+    ) -> None:
+        """Store a high-level per-camera latest event snapshot."""
+        categories: list[str] = []
+        if person_matched:
+            categories.append("Person")
+        if vehicle_matched:
+            categories.append("Vehicle")
+        if animal_matched:
+            categories.append("Animal")
+    
+        if len(categories) == 1:
+            state = f"{categories[0]} detected"
+            event_type = f"motion_{categories[0].lower()}"
+        elif categories:
+            state = f"{', '.join(categories)} detected"
+            event_type = "motion_multi"
+        else:
+            state = "Motion detected"
+            event_type = "motion"
+    
+        self._last_events[camera_id] = CameraLastEvent(
+            camera_id=camera_id,
+            event_type=event_type,
+            state=state,
+            last_detection=ts,
+            snapshot_url=self._still_image_url(camera_id),
+            memo=memo or None,
+            labels=labels_list or None,
+            matched_labels=combined or None,
+            stored_path=None,
+        )
+
+    async def async_fetch_camera_snapshot(self, camera_id: str) -> bytes | None:
+        """Fetch the current still image bytes for a camera."""
+        url = self._still_image_url(camera_id)
+        if not url:
+            return None
+
+        session = async_get_clientsession(self.hass)
+        cfg = self.api.config
+        ssl = False if cfg.ssl and not cfg.verify_ssl else None
+        auth = aiohttp.BasicAuth(cfg.username, password=cfg.password) if (cfg.username and cfg.password) else None
+
+        for attempt in (0, 1):
+            try:
+                async with session.get(url, auth=auth, ssl=ssl) as resp:
+                    if resp.status in (401, 403):
+                        if attempt == 1:
+                            return None
+                        await self.api.login()
+                        continue
+                    if resp.status in (502, 503, 504):
+                        return None
+                    resp.raise_for_status()
+                    return await resp.read()
+            except asyncio.TimeoutError:
+                return None
+            except aiohttp.ClientError:
+                return None
+            except Exception:
+                _LOGGER.debug("Unexpected error fetching snapshot for %s", camera_id, exc_info=True)
+                return None
+
+        return None
 
     def update_entry(self, entry: ConfigEntry) -> None:
         """Update config when options change."""
@@ -582,6 +699,17 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
                 matched=animal_matched,
                 ts=ts,
             )
+
+        self._record_last_motion_event(
+            camera_id=cam_id,
+            memo=memo,
+            labels_list=labels_list,
+            combined=combined,
+            person_matched=person_matched,
+            vehicle_matched=vehicle_matched,
+            animal_matched=animal_matched,
+            ts=ts,
+        )
             
     def process_mqtt_message(self, message: ReceiveMessage) -> None:
         """Thread-safe entrypoint called by MQTT; hand off to event loop."""
@@ -622,6 +750,7 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
             replace(
                 self.data,
                 mqtt=dict(self._mqtt),
+                last_events=dict(self._last_events),
             )
         )
 
@@ -735,6 +864,7 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
                 new_version=new_version,
                 cameras=cameras,
                 mqtt=self._mqtt,
+                last_events=dict(self._last_events),
                 base_url=self.api.base_url,
                 session_id=self.api.session_id,
             )

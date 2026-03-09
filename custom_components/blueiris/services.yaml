@@ -38,3 +38,19 @@ reload:
       required: false
       selector:
         text:
+
+latest_event_snapshot:
+  name: Latest Event Snapshot
+  description: Returns metadata for the latest AI event for a Blue Iris camera and optionally saves a still image.
+  target:
+    entity:
+      integration: blueiris
+      domain: camera
+  fields:
+    filename:
+      name: Filename
+      description: Optional filename for the saved snapshot. If omitted, the integration will create one automatically (e.g. driveway_latest.jpg). Files are stored in /config/www/blueiris/.
+      required: false
+      example: driveway_latest.jpg
+      selector:
+        text:

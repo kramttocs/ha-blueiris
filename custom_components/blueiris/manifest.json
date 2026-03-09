@@ -10,5 +10,5 @@
   "issue_tracker": "https://github.com/kramttocs/ha-blueiris/issues",
   "loggers": ["custom_components.blueiris"],
   "requirements": [],
-  "version": "2026.3.4"
+  "version": "2026.3.9"
 }

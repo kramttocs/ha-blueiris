@@ -126,6 +126,21 @@ class BlueIrisCamera(CoordinatorEntity[BlueIrisData], Camera):
                 elif k in ALLOWED_COMPLEX_KEYS:
                     attrs[k] = v
 
+        event = self.coordinator.get_last_event(self.camera_id)
+        if event is not None:
+            attrs["last_ai_event"] = event.state
+            attrs["last_ai_event_type"] = event.event_type
+            attrs["last_ai_event_time"] = event.last_detection
+            attrs["last_snapshot_url"] = event.snapshot_url
+            if event.memo is not None:
+                attrs["last_ai_event_memo"] = event.memo
+            if event.labels is not None:
+                attrs["last_ai_labels"] = event.labels
+            if event.matched_labels is not None:
+                attrs["last_ai_matched_labels"] = event.matched_labels
+            if event.stored_path is not None:
+                attrs["last_snapshot_path"] = event.stored_path
+
         self._attr_extra_state_attributes = attrs
         super()._handle_coordinator_update()
 
