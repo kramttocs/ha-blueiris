@@ -37,6 +37,7 @@ from .helpers.const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 TRIGGER_SCHEMA = vol.Schema({vol.Required("entity_id"): cv.entity_ids})
 PRESET_SCHEMA = vol.Schema(
     {
