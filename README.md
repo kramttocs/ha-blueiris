@@ -34,7 +34,7 @@ This integration allows Home Assistant to interact with your Blue Iris server, p
   - [Camera Entity](#camera-entity)
   - [Profile Switches](#profile-switches)
 - [Services](#services)
-  - [latest_event_snapshot](#latest_event_snapshot)
+  - [Latest Event Snapshot](#latest-event-snapshot)
   - [Trigger Camera](#trigger-camera)
   - [Move to Preset](#move-to-preset)
   - [Reload](#reload)
@@ -44,9 +44,11 @@ This integration allows Home Assistant to interact with your Blue Iris server, p
 
 # Credit
 
-This integration builds upon the excellent work originally created by **elad-bar**.
+Really appreciate the support team at Blue Iris Software.
 
-As he no longer actively uses Blue Iris, he granted permission to reuse ideas and concepts from the original project.
+This integration builds upon the excellent work originally created by **elad-bar**. As he no longer uses Blue Iris, he granted permission to reuse ideas and concepts from the original project.
+
+
 
 ---
 
