@@ -1,4 +1,7 @@
 {
-  "name": "BlueIris NVR",
-  "homeassistant": "2026.3.0"
+  "name": "Blue Iris NVR",
+  "domains": ["blueiris"],
+  "homeassistant": "2026.3.0",
+  "content_in_root": false,
+  "render_readme": true
 }
