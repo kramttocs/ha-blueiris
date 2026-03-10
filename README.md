@@ -2,7 +2,7 @@
 
 ![HomeAssistant](https://img.shields.io/badge/Home%20Assistant-Custom%20Integration-blue.svg)
 ![Maintenance](https://img.shields.io/badge/Maintained-Yes-brightgreen.svg)
-![HACS](https://img.shields.io/badge/HACS-Default-orange.svg)
+[![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 ![HA Version](https://img.shields.io/badge/Home%20Assistant-2024.6%2B-blue)
 
 Home Assistant integration for **Blue Iris Video Security Software**.
