@@ -40,7 +40,6 @@ This integration allows Home Assistant to interact with your Blue Iris server, p
   - [Reload](#reload)
 - [Blueprint](#blueprint)
   - [Blue Iris - Last Event Notifications](#blue-iris---last-event-notifications)
-  - [Optional Companion Automations for Mute Support](#optional-companion-automations-for-mute-support)
 - [Example Automation](#example-automation)
 
 ---
@@ -266,7 +265,13 @@ Reloads the integration without restarting Home Assistant.
 
 This integration pairs well with the **Blue Iris - Last Event Notifications** automation blueprint.
 
-The blueprint uses the integration's **Last Event sensors**, **camera entities**, and **latest snapshot service** to create clean, alarm-aware, camera-specific notifications with optional mute support.
+The blueprint uses the integration’s:
+
+- **Last Event sensors**
+- **camera entities**
+- **latest event snapshot service**
+
+to create clean, alarm-aware, camera-specific notifications with optional mute support.
 
 ### What the Blueprint Adds
 
@@ -280,7 +285,7 @@ The blueprint uses the integration's **Last Event sensors**, **camera entities**
   - `armed_away`
   - `armed_night`
   - `armed_vacation`
-- Snapshot image support using the integration's saved latest-event image
+- Snapshot image support using the integration’s saved latest-event image
 - Optional dynamic dashboard navigation per camera
 - Optional mute action support using a helper and companion automations
 
@@ -288,86 +293,20 @@ The blueprint uses the integration's **Last Event sensors**, **camera entities**
 
 [![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://raw.githubusercontent.com/kramttocs/ha-blueprints/main/Automations/blueiris-last-event-notifications.yaml)
 
-Blueprint source:
+### Full Blueprint Documentation
 
-`https://github.com/kramttocs/ha-blueprints/blob/main/Automations/blueiris-last-event-notifications.yaml`
+For full setup instructions, inputs, examples, and optional companion mute automations, see the blueprint documentation in the **ha-blueprints** repository:
 
-### Blueprint Naming Assumptions
+- Blueprint source: [`Automations/blueiris-last-event-notifications.yaml`](https://github.com/kramttocs/ha-blueprints/blob/main/Automations/blueiris-last-event-notifications.yaml)
+- Blueprint documentation: [`https://github.com/kramttocs/ha-blueprints`](https://github.com/kramttocs/ha-blueprints/tree/main)
 
-The blueprint assumes the following naming relationship:
+### Notes
 
-- Last event sensor: `sensor.<camera_object_id>_last_event`
-- Matching camera: `camera.<camera_object_id>`
-
-Example:
-
-- `sensor.home_driveway_last_event`
-- `camera.home_driveway`
-
-### Optional Companion Automations for Mute Support
-
-If you want to use the **Mute** action button, add these two companion automations.
-
-> [!IMPORTANT]
-> The helper and duration used in these companion automations must match the values selected in the blueprint.
-
-#### Actionable Notification - Blue Iris
-
-```yaml
-alias: Actionable Notification - Blue Iris
-description: >-
-  Handles the fixed Blue Iris mute notification action and enables the
-  configured notification mute helper.
-triggers:
-  - trigger: event
-    event_type: mobile_app_notification_action
-conditions:
-  - alias: Only continue for the Blue Iris mute action
-    condition: template
-    value_template: |
-      {{ trigger.event.data.action == 'MUTE_BLUEIRIS_LAST_EVENT' }}
-actions:
-  - alias: Turn on the Blue Iris notification mute helper
-    action: input_boolean.turn_on
-    target:
-      entity_id:
-        - input_boolean.blue_iris_mute_last_event_notification
-    data: {}
-  - alias: Send optional confirmation notification
-    action: notify.notify
-    data:
-      title: Blue Iris Notifications Muted
-      message: Last event notifications muted for 4 hours.
-mode: queued
-max: 10
-```
-
-#### Blue Iris - Reset Last Event Notification Mute
-
-```yaml
-alias: Blue Iris - Reset Last Event Notification Mute
-description: "Automatically turns off the configured Blue Iris notification mute helper after the selected mute duration."
-triggers:
-  - alias: Mute helper has been on for the full mute duration
-    trigger: state
-    entity_id:
-      - input_boolean.blue_iris_mute_last_event_notification
-    to:
-      - "on"
-    for:
-      hours: 4
-      minutes: 0
-      seconds: 0
-conditions: []
-actions:
-  - alias: Turn off the Blue Iris notification mute helper
-    action: input_boolean.turn_off
-    target:
-      entity_id:
-        - input_boolean.blue_iris_mute_last_event_notification
-    data: {}
-mode: restart
-```
+- The blueprint assumes the following naming relationship:
+  - `sensor.<camera_object_id>_last_event`
+  - `camera.<camera_object_id>`
+- The blueprint supports notifications with or without a locally saved snapshot image.
+- If you use the optional mute action, follow the companion automation setup in the blueprint documentation.
 
 ---
 
