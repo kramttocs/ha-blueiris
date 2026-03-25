@@ -7,6 +7,8 @@
 
 Home Assistant integration for **Blue Iris Video Security Software**.
 
+This is/was designed (original design by elad-bar), reviewed, and tested by me. AI assisted in generating documentation and some logic/design patterns.
+
 This integration allows Home Assistant to interact with your Blue Iris server, providing cameras, sensors, profile control, AI event tracking, snapshot support, and automation-friendly entities.
 
 📄 **Changelog**  
@@ -263,7 +265,7 @@ Reloads the integration without restarting Home Assistant.
 
 ## Blue Iris - Last Event Notifications
 
-This integration pairs well with the **Blue Iris - Last Event Notifications** automation blueprint.
+I strongly suggest checking out this blueprint if you want to see one way the last even sensor can be used.
 
 The blueprint uses the integration’s:
 
@@ -271,7 +273,7 @@ The blueprint uses the integration’s:
 - **camera entities**
 - **latest event snapshot service**
 
-to create clean, alarm-aware, camera-specific notifications with optional mute support.
+to create alarm-aware and camera-specific notifications with optional mute support.
 
 ### What the Blueprint Adds
 
@@ -312,7 +314,7 @@ For full setup instructions, inputs, examples, and optional companion mute autom
 
 # Example Automation
 
-If you want a simple hand-written automation instead of the blueprint, here is a basic example that sends a notification when a motion event occurs and includes the latest snapshot.
+If you want a simple automation instead of the blueprint, here is a basic example that sends a notification when a motion event occurs and includes the latest snapshot. It's not setup to be generic but just an example.
 
 ```yaml
 alias: Blue Iris - Driveway notification
@@ -341,8 +343,6 @@ action:
 ```
 
 ### Cache Busting
-
-Some devices cache images aggressively.
 
 Adding a timestamp ensures the newest snapshot is always displayed:
 
