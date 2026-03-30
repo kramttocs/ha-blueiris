@@ -9,7 +9,7 @@ Home Assistant integration for **Blue Iris Video Security Software**.
 
 This is/was designed (original design by elad-bar), reviewed, and tested by me. AI assisted in generating documentation and some logic/design patterns.
 
-This integration allows Home Assistant to interact with your Blue Iris server, providing cameras, sensors, profile control, AI event tracking, snapshot support, and automation-friendly entities.
+This integration allows Home Assistant to interact with your Blue Iris server, providing cameras, sensors, profile control, motion event tracking, snapshot support, and automation-friendly entities.
 
 📄 **Changelog**  
 [CHANGELOG.md](https://github.com/kramttocs/ha-blueiris/blob/main/CHANGELOG.md)
@@ -31,17 +31,17 @@ This integration allows Home Assistant to interact with your Blue Iris server, p
 - [AI Label Mapping](#ai-label-mapping)
 - [Entities and Components](#entities-and-components)
   - [Binary Sensors](#binary-sensors)
-  - [Last Event Sensors](#last-event-sensors)
+  - [Last Motion Event Sensors](#last-motion-event-sensors)
   - [Update Sensors](#update-sensors)
   - [Camera Entity](#camera-entity)
   - [Profile Switches](#profile-switches)
 - [Services](#services)
-  - [Latest Event Snapshot](#latest-event-snapshot)
+  - [Latest Motion Event Snapshot](#latest-motion-event-snapshot)
   - [Trigger Camera](#trigger-camera)
   - [Move to Preset](#move-to-preset)
   - [Reload](#reload)
 - [Blueprint](#blueprint)
-  - [Blue Iris - Last Event Notifications](#blue-iris---last-event-notifications)
+  - [Blue Iris - Last Motion Event Notifications](#blue-iris---last-motion-event-notifications)
 - [Example Automation](#example-automation)
 
 ---
@@ -145,14 +145,14 @@ Server sensors:
 
 - Alerts
 
-## Last Event Sensors
+## Last Motion Event Sensors
 
-Each camera configured with **Motion Sensors** also provides a **Last Event sensor**.
+Each camera configured with **Motion Sensors** also provides a **Last Motion Event sensor**.
 
 Example entity:
 
 ```text
-sensor.driveway_last_event
+sensor.driveway_last_motion_event
 ```
 
 Example state:
@@ -175,11 +175,11 @@ Example attributes:
 
 When a new event occurs, the stored snapshot path is cleared until a new snapshot is saved.
 
-### Why Last Event Sensors Matter
+### Why Last Motion Event Sensors Matter
 
 These sensors are designed to be automation-friendly and work especially well for notifications, camera-specific logic, and alarm-aware workflows.
 
-If you want a ready-to-use notification setup based on these sensors, see the blueprint below.
+If you want a ready-to-use notification setup based on these sensors, see the motion-focused blueprint below.
 
 ## Update Sensors
 
@@ -212,7 +212,7 @@ Behavior when turning a profile **off**:
 
 # Services
 
-## Latest Event Snapshot
+## Latest Motion Event Snapshot
 
 Fetch the latest snapshot for a camera and optionally save it locally.
 
@@ -224,13 +224,13 @@ Fetch the latest snapshot for a camera and optionally save it locally.
 If `filename` is omitted, the integration automatically uses:
 
 ```text
-<camera_id>_latest.jpg
+<camera_id>_latest_motion.jpg
 ```
 
 Example:
 
 ```yaml
-service: blueiris.latest_event_snapshot
+service: blueiris.latest_motion_event_snapshot
 target:
   entity_id: camera.driveway
 ```
@@ -238,13 +238,13 @@ target:
 Saved file:
 
 ```text
-/config/www/blueiris/driveway_latest.jpg
+/config/www/blueiris/driveway_latest_motion.jpg
 ```
 
 Accessible in Home Assistant as:
 
 ```text
-/local/blueiris/driveway_latest.jpg
+/local/blueiris/driveway_latest_motion.jpg
 ```
 
 ## Trigger Camera
@@ -263,31 +263,33 @@ Reloads the integration without restarting Home Assistant.
 
 # Blueprint
 
-## Blue Iris - Last Event Notifications
+## Blue Iris - Last Motion Event Notifications
 
-I strongly suggest checking out this blueprint if you want to see one way the last even sensor can be used.
+I strongly suggest checking out this blueprint if you want to see one way the last motion event sensor can be used.
 
 The blueprint uses the integration’s:
 
-- **Last Event sensors**
+- **Last Motion Event sensors**
 - **camera entities**
-- **latest event snapshot service**
+- **latest motion event snapshot service**
 
-to create alarm-aware and camera-specific notifications with optional mute support.
+to create alarm-aware and camera-specific motion notifications with optional mute support.
 
 ### What the Blueprint Adds
 
-- Notifications from multiple Blue Iris `*_last_event` sensors using one automation
-- Filtering by `event_type` such as:
+- Notifications from multiple Blue Iris `*_last_motion_event` sensors using one automation
+- Filtering by motion `event_type` values such as:
   - `motion_person`
   - `motion_vehicle`
   - `motion_animal`
+  - `motion_multi`
+  - `motion`
 - Camera-specific suppression by alarm state:
   - `armed_home`
   - `armed_away`
   - `armed_night`
   - `armed_vacation`
-- Snapshot image support using the integration’s saved latest-event image
+- Snapshot image support using the integration’s saved latest motion-event image
 - Optional dynamic dashboard navigation per camera
 - Optional mute action support using a helper and companion automations
 
@@ -305,7 +307,7 @@ For full setup instructions, inputs, examples, and optional companion mute autom
 ### Notes
 
 - The blueprint assumes the following naming relationship:
-  - `sensor.<camera_object_id>_last_event`
+  - `sensor.<camera_object_id>_last_motion_event`
   - `camera.<camera_object_id>`
 - The blueprint supports notifications with or without a locally saved snapshot image.
 - If you use the optional mute action, follow the companion automation setup in the blueprint documentation.
@@ -322,7 +324,7 @@ mode: queued
 
 trigger:
   - platform: state
-    entity_id: sensor.driveway_last_event
+    entity_id: sensor.driveway_last_motion_event
 
 condition:
   - condition: template
@@ -330,16 +332,16 @@ condition:
       {{ trigger.to_state.state not in ['unknown','unavailable','none','idle','No event'] }}
 
 action:
-  - service: blueiris.latest_event_snapshot
+  - service: blueiris.latest_motion_event_snapshot
     target:
       entity_id: camera.driveway
 
   - service: notify.mobile_app_your_phone
     data:
       title: "Blue Iris: Driveway"
-      message: "{{ states('sensor.driveway_last_event') }}"
+      message: "{{ states('sensor.driveway_last_motion_event') }}"
       data:
-        image: "/local/blueiris/driveway_latest.jpg?v={{ now().timestamp() }}"
+        image: "/local/blueiris/driveway_latest_motion.jpg?v={{ now().timestamp() }}"
 ```
 
 ### Cache Busting

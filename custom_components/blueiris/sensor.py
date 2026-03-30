@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .coordinator import BlueIrisData, BlueIrisDataUpdateCoordinator, CameraLastEvent
+from .coordinator import BlueIrisData, BlueIrisDataUpdateCoordinator, CameraLastMotionEvent
 from .helpers.const import DOMAIN, SENSOR_MOTION_NAME
 from .helpers.device import camera_device_info, camera_model, server_device_info
 from .helpers.entity import base_name, is_allowed
@@ -28,9 +28,9 @@ CONNECTION_HEALTH_DESCRIPTION = BlueIrisSensorEntityDescription(
     icon="mdi:heart-pulse",
 )
 
-LAST_EVENT_DESCRIPTION = BlueIrisSensorEntityDescription(
-    key="last_event",
-    name="Last Event",
+LAST_MOTION_EVENT_DESCRIPTION = BlueIrisSensorEntityDescription(
+    key="last_motion_event",
+    name="Last Motion Event",
     icon="mdi:image-search",
 )
 
@@ -56,7 +56,7 @@ async def async_setup_entry(
                 continue
             if not _motion_sensor_enabled(coordinator, cam_id):
                 continue
-            entities.append(BlueIrisCameraLastEventSensor(coordinator, cam_id))
+            entities.append(BlueIrisCameraLastMotionEventSensor(coordinator, cam_id))
 
     async_add_entities(entities)
 
@@ -127,16 +127,16 @@ class BlueIrisConnectionHealthSensor(
         }
 
 
-class BlueIrisCameraLastEventSensor(CoordinatorEntity[BlueIrisData], SensorEntity):
-    """High-level per-camera latest AI event sensor."""
+class BlueIrisCameraLastMotionEventSensor(CoordinatorEntity[BlueIrisData], SensorEntity):
+    """High-level per-camera latest motion event sensor."""
 
-    entity_description = LAST_EVENT_DESCRIPTION
+    entity_description = LAST_MOTION_EVENT_DESCRIPTION
     _attr_has_entity_name = True
 
     def __init__(self, coordinator: BlueIrisDataUpdateCoordinator, camera_id: str) -> None:
         super().__init__(coordinator)
         self.camera_id = camera_id
-        self._attr_unique_id = f"{coordinator.entry.entry_id}_{camera_id}_last_event"
+        self._attr_unique_id = f"{coordinator.entry.entry_id}_{camera_id}_last_motion_event"
 
     @property
     def _camera(self):
@@ -146,11 +146,11 @@ class BlueIrisCameraLastEventSensor(CoordinatorEntity[BlueIrisData], SensorEntit
         return data.cameras.get(self.camera_id)
 
     @property
-    def _event(self) -> CameraLastEvent | None:
+    def _event(self) -> CameraLastMotionEvent | None:
         data = self.coordinator.data
         if not data:
             return None
-        return data.last_events.get(self.camera_id)
+        return data.last_motion_events.get(self.camera_id)
 
     @property
     def device_info(self) -> DeviceInfo:
