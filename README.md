@@ -224,7 +224,7 @@ Fetch the latest snapshot for a camera and optionally save it locally.
 If `filename` is omitted, the integration automatically uses:
 
 ```text
-<camera_id>_latest.jpg
+<camera_id>_latest_motion.jpg
 ```
 
 Example:
@@ -238,13 +238,13 @@ target:
 Saved file:
 
 ```text
-/config/www/blueiris/driveway_latest.jpg
+/config/www/blueiris/driveway_latest_motion.jpg
 ```
 
 Accessible in Home Assistant as:
 
 ```text
-/local/blueiris/driveway_latest.jpg
+/local/blueiris/driveway_latest_motion.jpg
 ```
 
 ## Trigger Camera
@@ -341,7 +341,7 @@ action:
       title: "Blue Iris: Driveway"
       message: "{{ states('sensor.driveway_last_motion_event') }}"
       data:
-        image: "/local/blueiris/driveway_latest.jpg?v={{ now().timestamp() }}"
+        image: "/local/blueiris/driveway_latest_motion.jpg?v={{ now().timestamp() }}"
 ```
 
 ### Cache Busting

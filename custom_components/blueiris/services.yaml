@@ -49,8 +49,8 @@ latest_motion_event_snapshot:
   fields:
     filename:
       name: Filename
-      description: Optional filename for the saved snapshot. If omitted, the integration will create one automatically (e.g. driveway_latest.jpg). Files are stored in /config/www/blueiris/.
+      description: Optional filename for the saved snapshot. If omitted, the integration will create one automatically (e.g. driveway_latest_motion.jpg). Files are stored in /config/www/blueiris/.
       required: false
-      example: driveway_latest.jpg
+      example: driveway_latest_motion.jpg
       selector:
         text:

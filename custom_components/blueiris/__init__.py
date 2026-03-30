@@ -214,7 +214,7 @@ async def _async_handle_latest_motion_event_snapshot(
     if filename:
         filename = Path(filename).name
     else:
-        filename = f"{camera_id.lower()}_latest.jpg"
+        filename = f"{camera_id.lower()}_latest_motion.jpg"
 
     image = await coordinator.async_fetch_camera_snapshot(camera_id)
     if image is None:
