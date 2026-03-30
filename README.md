@@ -9,7 +9,7 @@ Home Assistant integration for **Blue Iris Video Security Software**.
 
 This is/was designed (original design by elad-bar), reviewed, and tested by me. AI assisted in generating documentation and some logic/design patterns.
 
-This integration allows Home Assistant to interact with your Blue Iris server, providing cameras, sensors, profile control, AI event tracking, snapshot support, and automation-friendly entities.
+This integration allows Home Assistant to interact with your Blue Iris server, providing cameras, sensors, profile control, motion event tracking, snapshot support, and automation-friendly entities.
 
 📄 **Changelog**  
 [CHANGELOG.md](https://github.com/kramttocs/ha-blueiris/blob/main/CHANGELOG.md)

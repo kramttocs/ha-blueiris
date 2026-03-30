@@ -317,7 +317,7 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
         return f"{base_url}/image/{camera_id}"
 
     def get_last_motion_event(self, camera_id: str) -> CameraLastMotionEvent | None:
-        """Return the latest tracked AI event for a camera, if any."""
+        """Return the latest tracked motion event for a camera, if any."""
         return self._last_motion_events.get(camera_id)
 
     def set_last_motion_event_stored_path(self, camera_id: str, stored_path: str | None) -> None:
