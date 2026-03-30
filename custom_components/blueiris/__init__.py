@@ -6,7 +6,6 @@ import asyncio
 import logging
 from pathlib import Path
 from typing import Any
-from functools import partial
 
 import voluptuous as vol
 
@@ -31,7 +30,7 @@ from .helpers.const import (
     SERVICE_TRIGGER_CAMERA,
     SERVICE_RELOAD,
     SERVICE_RELOAD_ENTRY_ID,
-    SERVICE_LATEST_EVENT_SNAPSHOT,
+    SERVICE_LATEST_MOTION_EVENT_SNAPSHOT,
     SERVICE_SNAPSHOT_FILENAME,
 )
 
@@ -46,7 +45,7 @@ PRESET_SCHEMA = vol.Schema(
     }
 )
 RELOAD_SCHEMA = vol.Schema({vol.Optional(SERVICE_RELOAD_ENTRY_ID): cv.string})
-LATEST_EVENT_SNAPSHOT_SCHEMA = vol.Schema(
+LATEST_MOTION_EVENT_SNAPSHOT_SCHEMA = vol.Schema(
     {
         vol.Optional("entity_id"): vol.Any(cv.entity_id, [cv.entity_id]),
         vol.Optional(SERVICE_SNAPSHOT_FILENAME): cv.string,
@@ -161,15 +160,15 @@ async def _async_handle_move_to_preset(hass: HomeAssistant, call: ServiceCall) -
 
 
 
-def _latest_event_payload(
+def _latest_motion_event_payload(
     coordinator: BlueIrisDataUpdateCoordinator,
     camera_id: str,
     *,
     filename: str | None = None,
 ) -> dict[str, Any]:
-    """Build a response payload for the latest event snapshot service."""
+    """Build a response payload for the latest motion event snapshot service."""
     data = coordinator.data
-    event = coordinator.get_last_event(camera_id)
+    event = coordinator.get_last_motion_event(camera_id)
     camera = data.cameras.get(camera_id) if data else None
 
     return {
@@ -187,10 +186,10 @@ def _latest_event_payload(
     }
 
 
-async def _async_handle_latest_event_snapshot(
+async def _async_handle_latest_motion_event_snapshot(
     hass: HomeAssistant, call: ServiceCall
 ) -> dict[str, Any]:
-    """Return latest event metadata and optionally save a current still image."""
+    """Return latest motion event metadata and optionally save a current still image."""
     entity_id = call.data.get("entity_id")
     if entity_id is None:
         entity_id = call.target.get("entity_id")
@@ -234,11 +233,11 @@ async def _async_handle_latest_event_snapshot(
     await hass.async_add_executor_job(path.write_bytes, image)
 
     _LOGGER.debug("Saved Blue Iris snapshot for %s to %s", entity_id, path)
-    coordinator.set_last_event_stored_path(camera_id, str(path))
+    coordinator.set_last_motion_event_stored_path(camera_id, str(path))
 
     local_url = f"/local/blueiris/{filename}"
 
-    payload = _latest_event_payload(coordinator, camera_id, filename=filename)
+    payload = _latest_motion_event_payload(coordinator, camera_id, filename=filename)
     payload["saved_filename"] = filename
     payload["saved_path"] = str(path)
     payload["local_snapshot_url"] = local_url
@@ -311,12 +310,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             schema=RELOAD_SCHEMA,
         )
 
-    if not hass.services.has_service(DOMAIN, SERVICE_LATEST_EVENT_SNAPSHOT):
+    if not hass.services.has_service(DOMAIN, SERVICE_LATEST_MOTION_EVENT_SNAPSHOT):
         hass.services.async_register(
             DOMAIN,
-            SERVICE_LATEST_EVENT_SNAPSHOT,
-            partial(_async_handle_latest_event_snapshot, hass),
-            schema=LATEST_EVENT_SNAPSHOT_SCHEMA,
+            SERVICE_LATEST_MOTION_EVENT_SNAPSHOT,
+            partial(_async_handle_latest_motion_event_snapshot, hass),
+            schema=LATEST_MOTION_EVENT_SNAPSHOT_SCHEMA,
             supports_response=SupportsResponse.OPTIONAL,
         )
 

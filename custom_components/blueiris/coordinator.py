@@ -155,8 +155,8 @@ class MqttEventState:
 
 
 @dataclass(slots=True)
-class CameraLastEvent:
-    """High-level latest AI event tracked per camera."""
+class CameraLastMotionEvent:
+    """High-level latest motion event tracked per camera."""
 
     camera_id: str
     event_type: str
@@ -182,7 +182,7 @@ class BlueIrisData:
     cameras: dict[str, CameraData]  # keyed by camera id
 
     mqtt: dict[str, MqttEventState]  # keyed by mqtt_key(...)
-    last_events: dict[str, CameraLastEvent]  # keyed by camera id
+    last_motion_events: dict[str, CameraLastMotionEvent]  # keyed by camera id
 
     base_url: str
     session_id: str | None
@@ -219,7 +219,7 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
         self.api = BlueIrisApi(hass, self._config)
 
         self._mqtt: dict[str, MqttEventState] = {}
-        self._last_events: dict[str, CameraLastEvent] = {}
+        self._last_motion_events: dict[str, CameraLastMotionEvent] = {}
 
         self._mqtt_unsub: Any | None = None
         self._mqtt_root = MQTT_ROOT_DEFAULT
@@ -316,18 +316,18 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
             return f"{base_url}/image/{camera_id}?session={session_id}"
         return f"{base_url}/image/{camera_id}"
 
-    def get_last_event(self, camera_id: str) -> CameraLastEvent | None:
+    def get_last_motion_event(self, camera_id: str) -> CameraLastMotionEvent | None:
         """Return the latest tracked AI event for a camera, if any."""
-        return self._last_events.get(camera_id)
+        return self._last_motion_events.get(camera_id)
 
-    def set_last_event_stored_path(self, camera_id: str, stored_path: str | None) -> None:
+    def set_last_motion_event_stored_path(self, camera_id: str, stored_path: str | None) -> None:
         """Persist the most recent saved snapshot path for a camera event."""
-        event = self._last_events.get(camera_id)
+        event = self._last_motion_events.get(camera_id)
         if event is None:
             return
         event.stored_path = stored_path
         if self.data is not None:
-            self.async_set_updated_data(replace(self.data, last_events=dict(self._last_events)))
+            self.async_set_updated_data(replace(self.data, last_motion_events=dict(self._last_motion_events)))
 
     def _record_last_motion_event(
         self,
@@ -341,7 +341,7 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
         animal_matched: list[str],
         ts: str,
     ) -> None:
-        """Store a high-level per-camera latest event snapshot."""
+        """Store a high-level per-camera latest motion event snapshot."""
         categories: list[str] = []
         if person_matched:
             categories.append("Person")
@@ -360,7 +360,7 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
             state = "Motion detected"
             event_type = "motion"
     
-        self._last_events[camera_id] = CameraLastEvent(
+        self._last_motion_events[camera_id] = CameraLastMotionEvent(
             camera_id=camera_id,
             event_type=event_type,
             state=state,
@@ -750,7 +750,7 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
             replace(
                 self.data,
                 mqtt=dict(self._mqtt),
-                last_events=dict(self._last_events),
+                last_motion_events=dict(self._last_motion_events),
             )
         )
 
@@ -864,7 +864,7 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
                 new_version=new_version,
                 cameras=cameras,
                 mqtt=self._mqtt,
-                last_events=dict(self._last_events),
+                last_motion_events=dict(self._last_motion_events),
                 base_url=self.api.base_url,
                 session_id=self.api.session_id,
             )
