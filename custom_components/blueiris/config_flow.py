@@ -98,6 +98,41 @@ def _unique_id(host: str, port: int, ssl: bool) -> str:
     return f"{host}:{port}:{int(bool(ssl))}"
 
 
+def _build_cached_lists(
+    camera_list: list[Any],
+    profiles: list[Any],
+    schedules: list[Any],
+) -> dict[str, list[selector.SelectOptionDict]]:
+    """Build selector option lists from Blue Iris camera/profile/schedule data."""
+    camera_opts = [
+        selector.SelectOptionDict(value=c.id, label=c.name)
+        for c in camera_list
+    ]
+
+    camera_opts_filtered = [
+        selector.SelectOptionDict(value=c.id, label=c.name)
+        for c in camera_list
+        if not _is_filtered_camera(c)
+    ]
+
+    profile_opts = [
+        selector.SelectOptionDict(value=str(idx), label=str(name))
+        for idx, name in enumerate(profiles)
+    ]
+
+    schedule_opts = [
+        selector.SelectOptionDict(value=str(idx), label=str(name))
+        for idx, name in enumerate(schedules)
+    ]
+
+    return {
+        "camera_all": camera_opts,
+        "camera_filtered": camera_opts_filtered,
+        CONF_ALLOWED_PROFILE: profile_opts,
+        CONF_ALLOWED_SCHEDULE: schedule_opts,
+    }
+
+
 def _build_settings_schema(
     *,
     cached_lists: dict[str, Any],
@@ -260,6 +295,12 @@ class BlueIrisConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             api = BlueIrisApi(self.hass, cfg)
             try:
                 await api.async_update()
+                api_data = api.data or {}
+                self._cached_lists = _build_cached_lists(
+                    list(api.camera_list),
+                    list(api_data.get("profiles", []) or []),
+                    list(api_data.get("schedules", []) or []),
+                )
 
                 self._data = {
                     CONF_HOST: host,
@@ -300,56 +341,42 @@ class BlueIrisConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             title = DEFAULT_NAME
             return self.async_create_entry(title=title, data=self._data, options=self._pending_options)
 
-        api = None
-        try:
-            cfg = BlueIrisConfig(
-                host=str(self._data.get(CONF_HOST, "")).strip(),
-                port=int(self._data.get(CONF_PORT, DEFAULT_PORT)),
-                ssl=bool(self._data.get(CONF_SSL, False)),
-                verify_ssl=bool(self._data.get(CONF_VERIFY_SSL, True)),
-                username=str(self._data.get(CONF_USERNAME, "")),
-                password=str(self._data.get(CONF_PASSWORD, "")),
-                stream_type=DEFAULT_STREAM_TYPE,
-            )
-            api = BlueIrisApi(self.hass, cfg)
-            await api.async_update()
-
-            camera_opts = [selector.SelectOptionDict(value=c.id, label=c.name) for c in api.camera_list]
-            camera_opts_filtered = [
-                selector.SelectOptionDict(value=c.id, label=c.name)
-                for c in api.camera_list
-                if not _is_filtered_camera(c)
-            ]
-
-            profiles = api.data.get("profiles", []) or []
-            profile_opts = [selector.SelectOptionDict(value=str(idx), label=str(name)) for idx, name in enumerate(profiles)]
-
-            schedules = api.data.get("schedules", []) or []
-            schedule_opts = [
-                selector.SelectOptionDict(value=str(idx), label=str(name)) for idx, name in enumerate(schedules)
-            ]
-
-            self._cached_lists = {
-                "camera_all": camera_opts,
-                "camera_filtered": camera_opts_filtered,
-                CONF_ALLOWED_PROFILE: profile_opts,
-                CONF_ALLOWED_SCHEDULE: schedule_opts,
-            }
-
-        except Exception:
-            _LOGGER.debug("Failed to fetch lists for config flow setup step", exc_info=True)
-            self._cached_lists = {
-                "camera_all": [],
-                "camera_filtered": [],
-                CONF_ALLOWED_PROFILE: [],
-                CONF_ALLOWED_SCHEDULE: [],
-            }
-        finally:
+        if not self._cached_lists:
+            api = None
             try:
-                if api is not None:
-                    await api.async_close()
+                cfg = BlueIrisConfig(
+                    host=str(self._data.get(CONF_HOST, "")).strip(),
+                    port=int(self._data.get(CONF_PORT, DEFAULT_PORT)),
+                    ssl=bool(self._data.get(CONF_SSL, False)),
+                    verify_ssl=bool(self._data.get(CONF_VERIFY_SSL, True)),
+                    username=str(self._data.get(CONF_USERNAME, "")),
+                    password=str(self._data.get(CONF_PASSWORD, "")),
+                    stream_type=DEFAULT_STREAM_TYPE,
+                )
+                api = BlueIrisApi(self.hass, cfg)
+                await api.async_update()
+
+                api_data = api.data or {}
+                self._cached_lists = _build_cached_lists(
+                    list(api.camera_list),
+                    list(api_data.get("profiles", []) or []),
+                    list(api_data.get("schedules", []) or []),
+                )                
+
             except Exception:
-                pass
+                _LOGGER.debug("Failed to fetch lists for config flow setup step", exc_info=True)
+                self._cached_lists = {
+                    "camera_all": [],
+                    "camera_filtered": [],
+                    CONF_ALLOWED_PROFILE: [],
+                    CONF_ALLOWED_SCHEDULE: [],
+                }
+            finally:
+                try:
+                    if api is not None:
+                        await api.async_close()
+                except Exception:
+                    pass
 
         defaults = {
             CONF_LOG_LEVEL: LOG_LEVEL_DEFAULT,
@@ -470,52 +497,57 @@ class BlueIrisOptionsFlow(config_entries.OptionsFlow):
                 return await self.async_step_ai_labels()
 
             return self.async_create_entry(title="", data=self._pending)
+        
+        # Prefer the running coordinator's last successful snapshot so opening Options
+        # does not cause an extra BI login/fetch cycle. Fall back to a fresh API call
+        # only if the coordinator is unavailable or has not updated yet.
+        coordinator = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
 
-        api = None
-        try:
-            entry = self.config_entry
-            cfg = BlueIrisConfig(
-                host=str(entry.data.get(CONF_HOST, "")),
-                port=int(entry.data.get(CONF_PORT, DEFAULT_PORT)),
-                ssl=bool(entry.data.get(CONF_SSL, False)),
-                verify_ssl=bool(entry.data.get(CONF_VERIFY_SSL, False)),
-                username=str(entry.data.get(CONF_USERNAME, "")),
-                password=str(entry.data.get(CONF_PASSWORD, "")),
-                stream_type=str(entry.options.get(CONF_STREAM_TYPE, DEFAULT_STREAM_TYPE)),
+        if coordinator is not None and coordinator.data is not None:
+            data = coordinator.data
+
+            self._cached_lists = _build_cached_lists(
+                list(data.cameras.values()),
+                list(data.data.get("profiles", []) or []),
+                list(data.data.get("schedules", []) or []),
             )
-            api = BlueIrisApi(self.hass, cfg)
-            await api.async_update()
-
-            camera_opts = [selector.SelectOptionDict(value=c.id, label=c.name) for c in api.camera_list]
-            camera_opts_filtered = [
-                selector.SelectOptionDict(value=c.id, label=c.name)
-                for c in api.camera_list
-                if not _is_filtered_camera(c)
-            ]
-
-            profiles = api.data.get("profiles", []) or []
-            profile_opts = [selector.SelectOptionDict(value=str(idx), label=str(name)) for idx, name in enumerate(profiles)]
-
-            schedules = api.data.get("schedules", []) or []
-            schedule_opts = [
-                selector.SelectOptionDict(value=str(idx), label=str(name)) for idx, name in enumerate(schedules)
-            ]
-
-            self._cached_lists = {
-                "camera_all": camera_opts,
-                "camera_filtered": camera_opts_filtered,
-                CONF_ALLOWED_PROFILE: profile_opts,
-                CONF_ALLOWED_SCHEDULE: schedule_opts,
-            }
-
-        except Exception:
-            _LOGGER.debug("Failed to fetch lists for options flow", exc_info=True)
-        finally:
+        else:
+            api = None
             try:
-                if api is not None:
-                    await api.async_close()
+                entry = self.config_entry
+                cfg = BlueIrisConfig(
+                    host=str(entry.data.get(CONF_HOST, "")),
+                    port=int(entry.data.get(CONF_PORT, DEFAULT_PORT)),
+                    ssl=bool(entry.data.get(CONF_SSL, False)),
+                    verify_ssl=bool(entry.data.get(CONF_VERIFY_SSL, False)),
+                    username=str(entry.data.get(CONF_USERNAME, "")),
+                    password=str(entry.data.get(CONF_PASSWORD, "")),
+                    stream_type=str(entry.options.get(CONF_STREAM_TYPE, DEFAULT_STREAM_TYPE)),
+                )
+                api = BlueIrisApi(self.hass, cfg)
+                await api.async_update()
+
+                api_data = api.data or {}
+                self._cached_lists = _build_cached_lists(
+                    list(api.camera_list),
+                    list(api_data.get("profiles", []) or []),
+                    list(api_data.get("schedules", []) or []),
+                )
+
             except Exception:
-                pass
+                _LOGGER.debug("Failed to fetch lists for options flow", exc_info=True)
+                self._cached_lists = {
+                    "camera_all": [],
+                    "camera_filtered": [],
+                    CONF_ALLOWED_PROFILE: [],
+                    CONF_ALLOWED_SCHEDULE: [],
+                }
+            finally:
+                try:
+                    if api is not None:
+                        await api.async_close()
+                except Exception:
+                    pass
 
         options = self.config_entry.options
         defaults = {

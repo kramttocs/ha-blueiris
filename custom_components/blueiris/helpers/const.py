@@ -194,4 +194,11 @@ MQTT_TYPE_TO_SENSOR_KEY = {
     "external": SENSOR_EXTERNAL_NAME,
 }
 
-PLATFORMS: Final[tuple[Platform, ...]] = (Platform.BINARY_SENSOR, Platform.CAMERA, Platform.SWITCH, Platform.SENSOR, Platform.UPDATE, Platform.SELECT)
+PLATFORMS: Final[tuple[Platform, ...]] = (
+    Platform.BINARY_SENSOR,
+    Platform.CAMERA,
+    Platform.SELECT,
+    Platform.SENSOR,
+    Platform.SWITCH,
+    Platform.UPDATE,
+)

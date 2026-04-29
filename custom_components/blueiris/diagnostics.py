@@ -44,7 +44,7 @@ async def async_get_config_entry_diagnostics(
         snapshot = {
             "counts": {
                 "cameras": len(getattr(data, "cameras", {}) or {}),
-                "mqtt_states": len(getattr(data, "mqtt_states", {}) or {}),
+                "mqtt_states": len(getattr(data, "mqtt", {}) or {}),
             },
             "last_refresh_success": _iso(getattr(coordinator, "last_update_success_time", None)),
             "last_exception": str(getattr(coordinator, "last_exception", "") or "") or None,

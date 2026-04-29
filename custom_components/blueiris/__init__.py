@@ -24,10 +24,8 @@ from .helpers.const import (
     DATA_SKIP_OPTIONS_RELOAD,
     DEFAULT_NAME,
     DOMAIN,
-    DOMAIN_LOGGER,
     PLATFORMS,
     SERVICE_MOVE_TO_PRESET,
-    SERVICE_SET_LEVEL,
     SERVICE_TRIGGER_CAMERA,
     SERVICE_RELOAD,
     SERVICE_RELOAD_ENTRY_ID,
@@ -243,6 +241,7 @@ async def _async_handle_latest_motion_event_snapshot(
 
     return payload
 
+
 async def async_setup(_hass: HomeAssistant, _config: dict) -> bool:
     """Set up via YAML (not used)."""
     return True
@@ -275,7 +274,7 @@ async def _async_run_camera_action(
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Blue Iris from a config entry."""
-    await _handle_log_level(hass, entry)
+    _handle_log_level(entry)
 
     coordinator = BlueIrisDataUpdateCoordinator(hass, entry)
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
@@ -340,7 +339,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     if coordinator is not None:
         await coordinator.async_shutdown()
-    
+
     skip_reload_once = hass.data.get(DATA_SKIP_OPTIONS_RELOAD)
     if isinstance(skip_reload_once, set):
         skip_reload_once.discard(entry.entry_id)
@@ -355,7 +354,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Handle options updates."""
-    await _handle_log_level(hass, entry)
+    _handle_log_level(entry)
 
     coordinator: BlueIrisDataUpdateCoordinator | None = hass.data.get(DOMAIN, {}).get(
         entry.entry_id
@@ -373,17 +372,22 @@ async def async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def _handle_log_level(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Apply the configured log level to the integration logger hierarchy."""
+def _handle_log_level(entry: ConfigEntry) -> None:
+    """Apply the configured log level to the integration logger."""
     log_level = entry.options.get(CONF_LOG_LEVEL, LOG_LEVEL_DEFAULT)
+    logger = logging.getLogger(f"custom_components.{DOMAIN}")
+
     if log_level == LOG_LEVEL_DEFAULT:
+        # Return control to the normal Home Assistant / Python logging hierarchy.
+        logger.setLevel(logging.NOTSET)
         return
 
+    level_name = str(log_level).upper()
+
     try:
-        await hass.services.async_call(
-            DOMAIN_LOGGER,
-            SERVICE_SET_LEVEL,
-            {f"custom_components.{DOMAIN}": str(log_level).lower()},
-        )
-    except Exception:  # noqa: BLE001
-        _LOGGER.exception("Failed to set log level. Ensure logger integration is configured.")
+        level_int = logging._checkLevel(level_name)
+    except (TypeError, ValueError):
+        _LOGGER.warning("Unknown log level %r; ignoring.", log_level)
+        return
+
+    logger.setLevel(level_int)

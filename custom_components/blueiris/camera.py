@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any, Final
-
-import aiohttp
 
 from homeassistant.components.camera import Camera, CameraEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.device_registry import DeviceInfo
 
@@ -23,16 +19,11 @@ from .helpers.const import (
     DOMAIN_STREAM,
     STREAM_VIDEO,
     DEFAULT_CONTENT_TYPE,
-    CAMERA_TYPE_MAPPING,
 )
 
 _LOGGER = logging.getLogger(__name__)
 ALLOWED_COMPLEX_KEYS: Final[set[str]] = {"group", "rects"}
 
-
-def _ssl_param(cfg) -> bool | None:
-    """Return aiohttp ssl parameter based on integration config."""
-    return False if cfg.ssl and not cfg.verify_ssl else None
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
     """Create camera entities for the cameras allowed by the current options."""
@@ -69,10 +60,6 @@ class BlueIrisCamera(CoordinatorEntity[BlueIrisData], Camera):
             else CameraEntityFeature(0)
         )
 
-        # Basic auth for still images/streams if configured
-        u = coordinator.api.config.username
-        p = coordinator.api.config.password
-        self._auth = aiohttp.BasicAuth(u, password=p) if (u and p) else None
 
     @property
     def _camera(self):
@@ -144,17 +131,6 @@ class BlueIrisCamera(CoordinatorEntity[BlueIrisData], Camera):
         self._attr_extra_state_attributes = attrs
         super()._handle_coordinator_update()
 
-    def _still_image_url(self) -> str:
-        """Build the Blue Iris still-image URL for this camera."""
-        data = self.coordinator.data
-        if not data:
-            return ""
-        base = data.base_url
-        session = data.session_id
-        if session:
-            return f"{base}/image/{self.camera_id}?session={session}"
-        return f"{base}/image/{self.camera_id}"
-
     async def stream_source(self) -> str | None:
         """Build the stream URL that Home Assistant should use for this camera."""
         cfg = self.coordinator.api.config
@@ -170,57 +146,12 @@ class BlueIrisCamera(CoordinatorEntity[BlueIrisData], Camera):
         if session:
             url = f"{url}?session={session}"
         return url
+    
 
-    async def async_camera_image(self, width: int | None = None, height: int | None = None) -> bytes | None:
-        """Return a still image response"""
-        url = self._still_image_url()
-        if not url:
-            return None
-
-        session = async_get_clientsession(self.hass)
-
-        cfg = self.coordinator.api.config
-        ssl = _ssl_param(cfg)
-
-        for attempt in (0, 1):  # allow one re-auth retry
-            try:
-                async with session.get(url, auth=self._auth, ssl=ssl) as resp:
-                    if resp.status in (401, 403):
-                        if attempt == 1:
-                            return None
-                        _LOGGER.debug(
-                            "Camera image auth error (%s) for %s; re-authenticating once.",
-                            resp.status,
-                            self.entity_id,
-                        )
-                        try:
-                            await self.coordinator.api.login()
-                        except Exception:  # noqa: BLE001
-                            _LOGGER.debug("Re-authentication failed for %s", self.entity_id, exc_info=True)
-                            return None
-                        continue  # retry once
-
-                    if resp.status in (502, 503, 504):
-                        _LOGGER.debug(
-                            "Transient camera image error (%s) for %s; returning None.",
-                            resp.status,
-                            self.entity_id,
-                        )
-                        return None
-
-                    resp.raise_for_status()
-                    return await resp.read()
-
-            except asyncio.TimeoutError:
-                _LOGGER.debug("Timeout fetching camera image for %s", self.entity_id)
-                return None
-
-            except aiohttp.ClientError as err:
-                _LOGGER.debug("Transport error fetching camera image for %s: %s", self.entity_id, err)
-                return None
-
-            except Exception:  # noqa: BLE001
-                _LOGGER.debug("Unexpected error fetching camera image for %s", self.entity_id, exc_info=True)
-                return None
-
-        return None
+    async def async_camera_image(
+        self,
+        width: int | None = None,
+        height: int | None = None,
+    ) -> bytes | None:
+        """Return a still image response."""
+        return await self.coordinator.api.fetch_camera_image(self.camera_id)

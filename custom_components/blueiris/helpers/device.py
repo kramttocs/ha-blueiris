@@ -10,7 +10,7 @@ from typing import Any
 
 from homeassistant.helpers.device_registry import DeviceInfo
 
-from .const import DOMAIN
+from .const import CAMERA_TYPE_MAPPING, DOMAIN
 from .entity import base_name
 
 
@@ -57,8 +57,6 @@ def camera_device_info(
 
 def camera_model(camera_type: object) -> str:
     """Map a Blue Iris camera type code to a friendly device model string."""
-    """Return the camera model string from CAMERA_TYPE_MAPPING, defaulting to 'Camera'."""
-    from .const import CAMERA_TYPE_MAPPING  # local import avoids circulars
     if isinstance(camera_type, int):
         return CAMERA_TYPE_MAPPING.get(camera_type, "Camera")
     return "Camera"

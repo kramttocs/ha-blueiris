@@ -5,7 +5,7 @@ import hashlib
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 import aiohttp
 from aiohttp import ClientSession, ClientTimeout
@@ -53,19 +53,18 @@ class BlueIrisConfig:
     stream_type: str = "H264"
     support_stream: bool = False
     hold_profile_changes: bool = True
-    allowed_camera: Optional[list[str]] = None
-    allowed_profile: Optional[list[str]] = None
-    allowed_schedule: Optional[list[str]] = None
-    allowed_motion_sensor: Optional[list[str]] = None
-    allowed_audio_sensor: Optional[list[str]] = None
-    allowed_connectivity_sensor: Optional[list[str]] = None
-    allowed_dio_sensor: Optional[list[str]] = None
-    allowed_external_sensor: Optional[list[str]] = None
+    allowed_camera: list[str] | None = None
+    allowed_profile: list[str] | None = None
+    allowed_schedule: list[str] | None = None
+    allowed_motion_sensor: list[str] | None = None
+    allowed_audio_sensor: list[str] | None = None
+    allowed_connectivity_sensor: list[str] | None = None
+    allowed_dio_sensor: list[str] | None = None
+    allowed_external_sensor: list[str] | None = None
 
-    # AI label customization (normalized, lowercase)
-    ai_person_labels: Optional[list[str]] = None
-    ai_vehicle_labels: Optional[list[str]] = None
-    ai_animal_labels: Optional[list[str]] = None
+    ai_person_labels: list[str] | None = None
+    ai_vehicle_labels: list[str] | None = None
+    ai_animal_labels: list[str] | None = None
 
     # Debug logging
     mqtt_debug: bool = False
@@ -79,8 +78,8 @@ class BlueIrisApi:
         self.hass = hass
         self._config = config
 
-        self.session: Optional[ClientSession] = None
-        self.session_id: Optional[str] = None
+        self.session: ClientSession | None = None
+        self.session_id: str | None = None
         self.is_logged_in: bool = False
         self.system_name: str | None = None
 
@@ -236,24 +235,26 @@ class BlueIrisApi:
         """Return the JSON API endpoint URL for the configured Blue Iris server."""
         return f"{self.base_url}/json"
 
+    def still_image_url(self, camera_id: str) -> str:
+        """Build the current Blue Iris still-image URL for a camera."""
+        if self.session_id:
+            return f"{self.base_url}/image/{camera_id}?session={self.session_id}"
+        return f"{self.base_url}/image/{camera_id}"
 
     # --- Cached compatibility properties (read-only) ---
     @property
     def data(self) -> dict[str, Any]:
         """Return cached login metadata from the most recent successful login."""
-        """Last login metadata payload (compatibility)."""
         return self._login_data
 
     @property
     def status(self) -> dict[str, Any]:
         """Return cached server status from the most recent status request."""
-        """Last fetched status payload (compatibility)."""
         return self._last_status
 
     @property
     def camera_list(self) -> list[CameraData]:
         """Return the cached normalized camera list from the most recent camlist request."""
-        """Last fetched camera list (compatibility)."""
         return self._last_camlist
 
 
@@ -346,7 +347,6 @@ class BlueIrisApi:
 
     async def verified_post(self, payload: dict[str, Any]) -> dict[str, Any]:
         """POST a command, retrying once after re-authentication if the session is stale."""
-        """Post and ensure we are logged in; retry once after re-login on auth failure."""
         payload = dict(payload)
 
         if not self.is_logged_in or not self.session_id:
@@ -401,13 +401,76 @@ class BlueIrisApi:
             raise RuntimeError(f"Blue Iris request failed after reauth for cmd={cmd} reason={raw_reason2!r}")
 
         return result
+    
+    async def fetch_camera_image(self, camera_id: str) -> bytes | None:
+        """Fetch a current still image for a camera, retrying once after re-auth."""
+        await self.ensure_session()
+
+        auth = (
+            aiohttp.BasicAuth(self._config.username, password=self._config.password)
+            if self._config.username and self._config.password
+            else None
+        )
+
+        for attempt in (0, 1):
+            # Build the URL inside the loop so a re-login gets a fresh session id.
+            url = self.still_image_url(camera_id)
+
+            try:
+                async with self.session.get(
+                    url,
+                    auth=auth,
+                    ssl=self._ssl_param(),
+                ) as resp:
+                    if resp.status in (401, 403):
+                        if attempt == 1:
+                            return None
+
+                        _LOGGER.debug(
+                            "Camera image auth error (%s) for %s; re-authenticating once.",
+                            resp.status,
+                            camera_id,
+                        )
+                        try:
+                            self.is_logged_in = False
+                            self.session_id = None
+                            await self.login()
+                        except Exception:  # noqa: BLE001
+                            _LOGGER.debug(
+                                "Re-authentication failed while fetching snapshot for %s",
+                                camera_id,
+                                exc_info=True,
+                            )
+                            return None
+                        continue
+
+                    if resp.status in (502, 503, 504):
+                        _LOGGER.debug(
+                            "Transient camera image error (%s) for %s; returning None.",
+                            resp.status,
+                            camera_id,
+                        )
+                        return None
+
+                    resp.raise_for_status()
+                    return await resp.read()
+
+            except asyncio.TimeoutError:
+                _LOGGER.debug("Timeout fetching camera image for %s", camera_id)
+                return None
+
+            except aiohttp.ClientError as err:
+                _LOGGER.debug("Transport error fetching camera image for %s: %s", camera_id, err)
+                return None
+
+            except Exception:  # noqa: BLE001
+                _LOGGER.debug("Unexpected error fetching camera image for %s", camera_id, exc_info=True)
+                return None
+
+        return None
 
     async def fetch_status(self) -> dict[str, Any]:
-        """Fetch raw server status from Blue Iris and update the local status cache."""
-        """Fetch current status data from Blue Iris (stateless return).
-
-        Also updates the internal compatibility cache.
-        """
+        """Fetch current status data from Blue Iris (stateless return)."""
         resp = await self.verified_post({"cmd": "status"})
         data = resp.get("data", {})
         status = data if isinstance(data, dict) else {}
@@ -417,10 +480,6 @@ class BlueIrisApi:
 
     async def fetch_camlist(self) -> list[CameraData]:
         """Fetch the raw camera list, normalize it, and update the local camera cache."""
-        """Fetch camera list from Blue Iris (stateless return).
-
-        Also updates the internal compatibility cache.
-        """
         resp = await self.verified_post({"cmd": "camlist"})
         cams = resp.get("data", [])
         if not isinstance(cams, list):
@@ -442,23 +501,23 @@ class BlueIrisApi:
 
     async def async_update_camlist(self) -> None:
         """Refresh only the cached camera list."""
-        """Refresh the camera list from Blue Iris."""
         await self.fetch_camlist()
 
     async def async_update_status(self) -> None:
         """Refresh only the cached server status."""
-        """Refresh the status payload from Blue Iris."""
         await self.fetch_status()
 
     async def async_update(self) -> None:
         """Refresh both status and camera list in the preserved update order."""
-        """Refresh all API state (status + camlist)."""
         await self.async_update_status()
         await self.async_update_camlist()
         self._last_update = datetime.now()
 
     # ---- Actions ----
     async def set_profile(self, profile_id: int, hold: bool | None = None) -> None:
+        """Set the active Blue Iris profile, optionally holding it based on integration config."""
+        # hold_profile_changes is controlled by the server-level config switch.
+        # When enabled, sending the same profile command again tells Blue Iris to hold it.
         payload = {"cmd": "status", "profile": int(profile_id)}
         resp = await self.verified_post(payload)
         data = resp.get("data") or {}
@@ -494,6 +553,5 @@ class BlueIrisApi:
 
     async def async_close(self) -> None:
         """Close the managed HTTP session and clear login state."""
-        """Do NOT close HA's shared aiohttp session."""
         # Home Assistant owns the session lifecycle.
         return
