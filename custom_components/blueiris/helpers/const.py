@@ -18,6 +18,8 @@ LOG_LEVEL_DEFAULT: Final[str] = "Default"
 
 CONF_HOLD_PROFILE_CHANGES: Final[str] = "hold_profile_changes"
 DEFAULT_HOLD_PROFILE_CHANGES: Final[bool] = True
+HOLD_PROFILE_CHANGES_ICON: Final[str] = "mdi:lock"
+DATA_SKIP_OPTIONS_RELOAD: Final[str] = f"{DOMAIN}_skip_options_reload_once"
 
 CONF_ALLOWED_CAMERA: Final[str] = "allowed_camera"
 CONF_ALLOWED_PROFILE: Final[str] = "allowed_profile"
@@ -192,4 +194,4 @@ MQTT_TYPE_TO_SENSOR_KEY = {
     "external": SENSOR_EXTERNAL_NAME,
 }
 
-PLATFORMS: Final[tuple[Platform, ...]] = (Platform.BINARY_SENSOR, Platform.CAMERA, Platform.SWITCH, Platform.SENSOR, Platform.UPDATE,)
+PLATFORMS: Final[tuple[Platform, ...]] = (Platform.BINARY_SENSOR, Platform.CAMERA, Platform.SWITCH, Platform.SENSOR, Platform.UPDATE, Platform.SELECT)
