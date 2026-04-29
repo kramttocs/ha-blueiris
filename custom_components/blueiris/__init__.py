@@ -21,6 +21,7 @@ from .helpers.device import server_device_name
 from .helpers.const import (
     CONF_LOG_LEVEL,
     LOG_LEVEL_DEFAULT,
+    DATA_SKIP_OPTIONS_RELOAD,
     DEFAULT_NAME,
     DOMAIN,
     DOMAIN_LOGGER,
@@ -158,8 +159,6 @@ async def _async_handle_move_to_preset(hass: HomeAssistant, call: ServiceCall) -
     await _async_run_camera_action(hass, entity_ids, _action)
 
 
-
-
 def _latest_motion_event_payload(
     coordinator: BlueIrisDataUpdateCoordinator,
     camera_id: str,
@@ -208,7 +207,7 @@ async def _async_handle_latest_motion_event_snapshot(
         hass, entity_id
     )
 
-    base_snapshot_dir = Path("/config/www/blueiris")
+    base_snapshot_dir = Path(hass.config.path("www", "blueiris"))
 
     filename = call.data.get(SERVICE_SNAPSHOT_FILENAME)
     if filename:
@@ -334,7 +333,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry and clean up coordinator resources."""
-    """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     coordinator: BlueIrisDataUpdateCoordinator | None = hass.data.get(DOMAIN, {}).pop(
@@ -342,6 +340,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     if coordinator is not None:
         await coordinator.async_shutdown()
+    
+    skip_reload_once = hass.data.get(DATA_SKIP_OPTIONS_RELOAD)
+    if isinstance(skip_reload_once, set):
+        skip_reload_once.discard(entry.entry_id)
+        if not skip_reload_once:
+            hass.data.pop(DATA_SKIP_OPTIONS_RELOAD, None)
 
     if not hass.data.get(DOMAIN):
         hass.data.pop(DOMAIN, None)
@@ -350,9 +354,22 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Reload the entry after options are changed through the UI."""
     """Handle options updates."""
     await _handle_log_level(hass, entry)
+
+    coordinator: BlueIrisDataUpdateCoordinator | None = hass.data.get(DOMAIN, {}).get(
+        entry.entry_id
+    )
+    if coordinator is not None:
+        coordinator.update_entry(entry)
+
+    skip_reload_once = hass.data.get(DATA_SKIP_OPTIONS_RELOAD)
+    if isinstance(skip_reload_once, set) and entry.entry_id in skip_reload_once:
+        skip_reload_once.discard(entry.entry_id)
+        if not skip_reload_once:
+            hass.data.pop(DATA_SKIP_OPTIONS_RELOAD, None)
+        return
+
     await hass.config_entries.async_reload(entry.entry_id)
 
 

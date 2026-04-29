@@ -53,11 +53,16 @@ def unique_id_binary_sensor(entry_id: str, camera_id: str, sensor_key: str) -> s
     return f"{DOMAIN}-{entry_id}-bs-{camera_id}-{sensor_key}"
 
 
-def unique_id_profile(entry_id: str, profile_id: int | str) -> str:
-    """Build the stable unique id for a profile switch entity."""
-    return f"{DOMAIN}-{entry_id}-profile-{profile_id}"
+def unique_id_profile(entry_id: str) -> str:
+    """Build the stable unique id for the profile select entity."""
+    return f"{DOMAIN}-{entry_id}-profile-select"
 
 
-def unique_id_schedule(entry_id: str, schedule_name: str) -> str:
-    """Build the stable unique id for a schedule switch entity."""
-    return f"{DOMAIN}-{entry_id}-schedule-{schedule_name}"
+def unique_id_schedule(entry_id: str) -> str:
+    """Build the stable unique id for the schedule select entity."""
+    return f"{DOMAIN}-{entry_id}-schedule-select"
+
+
+def unique_id_hold_profile_changes(entry_id: str) -> str:
+    """Build the stable unique id for the hold-profile-changes config switch."""
+    return f"{DOMAIN}-{entry_id}-hold-profile-changes"

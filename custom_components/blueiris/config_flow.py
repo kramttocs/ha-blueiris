@@ -130,7 +130,6 @@ def _build_settings_schema(
             )
         ),
         vol.Optional(CONF_SUPPORT_STREAM, default=defaults[CONF_SUPPORT_STREAM]): selector.BooleanSelector(),
-        vol.Optional(CONF_HOLD_PROFILE_CHANGES, default=defaults[CONF_HOLD_PROFILE_CHANGES]): selector.BooleanSelector(),
         vol.Optional(CONF_ALLOWED_CAMERA, default=defaults[CONF_ALLOWED_CAMERA]): selector.SelectSelector(
             selector.SelectSelectorConfig(
                 options=cached_lists.get("camera_all", []),
@@ -290,7 +289,10 @@ class BlueIrisConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             self._pending_options = dict(user_input)
-
+            self._pending_options.setdefault(
+                CONF_HOLD_PROFILE_CHANGES,
+                DEFAULT_HOLD_PROFILE_CHANGES,
+            )
             allowed_motion = self._pending_options.get(CONF_ALLOWED_MOTION_SENSOR, [])
             if allowed_motion:
                 return await self.async_step_ai_labels_setup()
@@ -353,7 +355,6 @@ class BlueIrisConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             CONF_LOG_LEVEL: LOG_LEVEL_DEFAULT,
             CONF_STREAM_TYPE: DEFAULT_STREAM_TYPE,
             CONF_SUPPORT_STREAM: False,
-            CONF_HOLD_PROFILE_CHANGES: DEFAULT_HOLD_PROFILE_CHANGES,
             CONF_ALLOWED_CAMERA: [],
             CONF_ALLOWED_PROFILE: [],
             CONF_ALLOWED_SCHEDULE: [],
@@ -454,7 +455,12 @@ class BlueIrisOptionsFlow(config_entries.OptionsFlow):
 
         if user_input is not None:
             self._pending = dict(user_input)
-
+            self._pending[CONF_HOLD_PROFILE_CHANGES] = bool(
+                self.config_entry.options.get(
+                    CONF_HOLD_PROFILE_CHANGES,
+                    DEFAULT_HOLD_PROFILE_CHANGES,
+                )
+            )
             allowed_motion = self._pending.get(
                 CONF_ALLOWED_MOTION_SENSOR,
                 self.config_entry.options.get(CONF_ALLOWED_MOTION_SENSOR, []),
@@ -516,7 +522,6 @@ class BlueIrisOptionsFlow(config_entries.OptionsFlow):
             CONF_LOG_LEVEL: options.get(CONF_LOG_LEVEL, LOG_LEVEL_DEFAULT),
             CONF_STREAM_TYPE: options.get(CONF_STREAM_TYPE, DEFAULT_STREAM_TYPE),
             CONF_SUPPORT_STREAM: bool(options.get(CONF_SUPPORT_STREAM, False)),
-            CONF_HOLD_PROFILE_CHANGES: bool(options.get(CONF_HOLD_PROFILE_CHANGES, DEFAULT_HOLD_PROFILE_CHANGES)),
             CONF_ALLOWED_CAMERA: options.get(CONF_ALLOWED_CAMERA, []),
             CONF_ALLOWED_PROFILE: options.get(CONF_ALLOWED_PROFILE, []),
             CONF_ALLOWED_SCHEDULE: options.get(CONF_ALLOWED_SCHEDULE, []),

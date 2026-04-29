@@ -471,7 +471,10 @@ class BlueIrisApi:
         self._last_status = data
 
     async def set_schedule(self, schedule_name: str) -> None:
-        await self.verified_post({"cmd": "status", "schedule": str(schedule_name)})
+        """Set the active Blue Iris schedule."""
+        resp = await self.verified_post({"cmd": "status", "schedule": str(schedule_name)})
+        data = resp.get("data") or {}
+        self._last_status = data
 
     async def trigger_camera(self, camera_id: str) -> None:
         await self.verified_post({"cmd": "trigger", "camera": camera_id})
