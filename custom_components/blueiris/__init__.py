@@ -347,6 +347,14 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.data.pop(DATA_SKIP_OPTIONS_RELOAD, None)
 
     if not hass.data.get(DOMAIN):
+        for service_name in (
+            SERVICE_TRIGGER_CAMERA,
+            SERVICE_MOVE_TO_PRESET,
+            SERVICE_RELOAD,
+            SERVICE_LATEST_MOTION_EVENT_SNAPSHOT,
+        ):
+            hass.services.async_remove(DOMAIN, service_name)
+
         hass.data.pop(DOMAIN, None)
 
     return unload_ok

@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC,datetime
 from typing import Any
 
 import aiohttp
@@ -92,9 +92,9 @@ class BlueIrisApi:
         self._last_status: dict[str, Any] = {}
         self._last_camlist: list[CameraData] = []
 
-        self._last_update = datetime.min
-        self._last_status_update = datetime.min
-        self._last_camlist_update = datetime.min
+        self._last_update: datetime | None = None
+        self._last_status_update: datetime | None = None
+        self._last_camlist_update: datetime | None = None
 
     @staticmethod
     def _normalize_cam_id(c: dict[str, Any]) -> str | None:
@@ -273,14 +273,18 @@ class BlueIrisApi:
         return None
 
     def _is_auth_failure(self, reason: str) -> bool:
-        r = (reason or "").lower()
+        """Return True when a Blue Iris response reason indicates auth/session failure."""
+        r = (reason or "").strip().lower()
         return (
             "invalid session" in r
             or "access denied" in r
-            or "authorization" in r
             or "unauthorized" in r
-            or "login" in r
-            or "auth" in r
+            or "authorization" in r
+            or "not logged in" in r
+            or r == "login"
+            or r.startswith("login ")
+            or "authentication" in r
+            or "not authenticated" in r
         )
 
     async def _post_with_session(self, payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -475,7 +479,7 @@ class BlueIrisApi:
         data = resp.get("data", {})
         status = data if isinstance(data, dict) else {}
         self._last_status = status
-        self._last_status_update = datetime.now()
+        self._last_status_update = datetime.now(UTC)
         return status
 
     async def fetch_camlist(self) -> list[CameraData]:
@@ -484,7 +488,7 @@ class BlueIrisApi:
         cams = resp.get("data", [])
         if not isinstance(cams, list):
             self._last_camlist = []
-            self._last_camlist_update = datetime.now()
+            self._last_camlist_update = datetime.now(UTC)
             return []
 
         camera_list: list[CameraData] = []
@@ -496,7 +500,7 @@ class BlueIrisApi:
                 camera_list.append(cam)
 
         self._last_camlist = camera_list
-        self._last_camlist_update = datetime.now()
+        self._last_camlist_update = datetime.now(UTC)
         return camera_list
 
     async def async_update_camlist(self) -> None:
@@ -511,7 +515,7 @@ class BlueIrisApi:
         """Refresh both status and camera list in the preserved update order."""
         await self.async_update_status()
         await self.async_update_camlist()
-        self._last_update = datetime.now()
+        self._last_update = datetime.now(UTC)
 
     # ---- Actions ----
     async def set_profile(self, profile_id: int, hold: bool | None = None) -> None:
