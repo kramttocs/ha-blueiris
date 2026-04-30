@@ -205,7 +205,12 @@ If you want a ready-to-use notification setup based on these sensors, see the mo
 
 The **Server device** includes an **Update sensor** that allows Home Assistant to detect when a newer Blue Iris version is available.
 
-This sensor can also trigger a Blue Iris update when supported.
+This sensor can also trigger a Blue Iris update. 
+
+Because Blue Iris is outside of Home Assistant there's not really any indication that anything is happening once clicked.
+It will also remain as the old version for awhile until it has to perform a new login. 
+
+Will try to improve this in the future.
 
 ## Camera Entity
 
