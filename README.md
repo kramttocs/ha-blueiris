@@ -10,6 +10,10 @@ This is/was designed (original design by elad-bar), reviewed, and tested by me. 
 
 This integration allows Home Assistant to interact with your Blue Iris server, providing cameras, sensors, profile control, motion event tracking, snapshot support, and automation-friendly entities.
 
+> [!WARNING]
+> Do not install this over elad-bar's version. Remove the old Blue Iris integration first.
+> Both integrations use the same Home Assistant domain, so they cannot coexist.
+
 📄 **Changelog**  
 [CHANGELOG.md](https://github.com/kramttocs/ha-blueiris/blob/main/CHANGELOG.md)
 
