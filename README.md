@@ -13,6 +13,11 @@ This integration allows Home Assistant to interact with your Blue Iris server, p
 > [!WARNING]
 > Do not install this over elad-bar's version. Remove that Blue Iris integration first.
 > Both integrations use the same Home Assistant domain, so they cannot coexist.
+>
+
+> [!IMPORTANT]
+> This integration also changes how the MQTT messages/topics are setup in Blue Iris to allow for multiple Blue Iris servers.
+> Please see the linked Manual
 
 📄 **Changelog**  
 [CHANGELOG.md](https://github.com/kramttocs/ha-blueiris/blob/main/CHANGELOG.md)
