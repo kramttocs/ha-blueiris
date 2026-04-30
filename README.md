@@ -1,7 +1,6 @@
 # <img src="custom_components/blueiris/brand/icon.png" alt="Blue Iris logo" width="42"> Blue Iris
 ![HomeAssistant](https://img.shields.io/badge/Home%20Assistant-Custom%20Integration-blue.svg)
 ![Maintenance](https://img.shields.io/badge/Maintained-Yes-brightgreen.svg)
-[![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 ![HA Version](https://img.shields.io/badge/Home%20Assistant-2024.6%2B-blue)
 
 Home Assistant integration for **Blue Iris Video Security Software**.
@@ -73,12 +72,25 @@ This integration builds upon the excellent work originally created by **elad-bar
 - To control **Profiles**, the user must have **Admin permissions**
 - **MQTT integration (optional)** for real-time event updates
 
-## Installation via HACS
+## Installation via HACS Custom Repository
+
+> [!NOTE]
+> This integration is currently installed through HACS as a **custom repository**. It is not yet available in the default HACS repository list.
 
 1. Open **HACS**
-2. Search for **Blue Iris**
-3. Install the integration
-4. Restart Home Assistant if prompted
+2. Open the **three-dot menu** in the top-right corner
+3. Select **Custom repositories**
+4. Add this repository URL:
+
+   ```text
+   https://github.com/kramttocs/ha-blueiris
+   ```
+
+5. Set the category to **Integration**
+6. Click **Add**
+7. Search for **Blue Iris** in HACS
+8. Install the integration
+9. Restart Home Assistant if prompted
 
 ---
 
