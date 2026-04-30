@@ -1,6 +1,6 @@
 {
   "domain": "blueiris",
-  "name": "Blue Iris NVR",
+  "name": "Blue Iris",
   "after_dependencies": ["mqtt"],
   "codeowners": ["@kramttocs"],
   "config_flow": true,
@@ -10,5 +10,5 @@
   "issue_tracker": "https://github.com/kramttocs/ha-blueiris/issues",
   "loggers": ["custom_components.blueiris"],
   "requirements": [],
-  "version": "2026.3.9"
+  "version": "2026.4.29"
 }
