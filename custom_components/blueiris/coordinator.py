@@ -7,12 +7,11 @@ import json
 import logging
 import re
 import time
+from collections.abc import Awaitable
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from json import JSONDecodeError
-from collections.abc import Awaitable
 from typing import Any
-
 
 from homeassistant.components import mqtt
 from homeassistant.components.mqtt import ReceiveMessage
@@ -709,7 +708,7 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
             _LOGGER.debug("Ignoring non-dict JSON payload topic=%s payload=%r", message.topic, payload)
             return
 
-        self.hass.async_create_task(
+        self.hass.create_task(
             self._async_process_mqtt_message(message.topic, payload),
             name=f"{DOMAIN}_mqtt_message",
         )
