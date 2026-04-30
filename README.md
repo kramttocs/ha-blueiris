@@ -1,5 +1,4 @@
-# Blue Iris
-
+# <img src="custom_components/blueiris/brand/icon.png" alt="Blue Iris logo" width="42"> Blue Iris
 ![HomeAssistant](https://img.shields.io/badge/Home%20Assistant-Custom%20Integration-blue.svg)
 ![Maintenance](https://img.shields.io/badge/Maintained-Yes-brightgreen.svg)
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
