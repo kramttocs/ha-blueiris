@@ -41,8 +41,6 @@ def is_explicitly_enabled(allowed: Iterable[str] | None, item_id: str) -> bool:
     return bool(allowed) and item_id in allowed
 
 
-
-
 def unique_id_camera(entry_id: str, camera_id: str) -> str:
     """Build the stable unique id for a camera entity."""
     return f"{DOMAIN}-{entry_id}-camera-{camera_id}"
@@ -55,12 +53,12 @@ def unique_id_binary_sensor(entry_id: str, camera_id: str, sensor_key: str) -> s
 
 def unique_id_profile(entry_id: str) -> str:
     """Build the stable unique id for the profile select entity."""
-    return f"{DOMAIN}-{entry_id}-profile-select"
+    return f"{DOMAIN}-{entry_id}-profile"
 
 
 def unique_id_schedule(entry_id: str) -> str:
     """Build the stable unique id for the schedule select entity."""
-    return f"{DOMAIN}-{entry_id}-schedule-select"
+    return f"{DOMAIN}-{entry_id}-schedule"
 
 
 def unique_id_hold_profile_changes(entry_id: str) -> str:

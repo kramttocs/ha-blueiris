@@ -8,7 +8,6 @@ Pure refactor helper (no behavior change intended).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,7 +28,7 @@ class ParsedTopic:
         return self.camera_id.lower() == "system"
 
 
-def parse_topic(topic: str) -> Optional[ParsedTopic]:
+def parse_topic(topic: str) -> ParsedTopic | None:
     """Parse a BI MQTT topic.
 
     Returns None when the topic does not match the expected 4-segment format.

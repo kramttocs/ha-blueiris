@@ -31,7 +31,7 @@ HOLD_PROFILE_CHANGES_DESCRIPTION = SwitchEntityDescription(
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
-    """Create admin-only profile and schedule switches for this entry."""
+    """Create server-level Blue Iris config switches for this entry."""
     coordinator: BlueIrisDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
 
     data = coordinator.data

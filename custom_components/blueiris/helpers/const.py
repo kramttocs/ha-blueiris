@@ -50,7 +50,6 @@ STREAM_VIDEO: Final[dict[str, dict[str, str]]] = {
     STREAM_TYPE_MJPG: {"stream_name": "mjpg"},
 }
 
-DOMAIN_LOGGER: Final[str] = "logger"
 DOMAIN_STREAM: Final[str] = "stream"
 
 DEFAULT_CONTENT_TYPE: Final[str] = "image/jpeg"
@@ -62,7 +61,6 @@ DEFAULT_ICON: Final[str] = "mdi:eye-circle"
 PROFILE_ICON: Final[str] = "mdi:shield-home"
 SCHEDULE_ICON: Final[str] = "mdi:calendar-clock"
 
-SERVICE_SET_LEVEL: Final[str] = "set_level"
 SERVICE_TRIGGER_CAMERA: Final[str] = "trigger_camera"
 SERVICE_MOVE_TO_PRESET: Final[str] = "move_to_preset"
 SERVICE_RELOAD: Final[str] = "reload"
@@ -194,4 +192,11 @@ MQTT_TYPE_TO_SENSOR_KEY = {
     "external": SENSOR_EXTERNAL_NAME,
 }
 
-PLATFORMS: Final[tuple[Platform, ...]] = (Platform.BINARY_SENSOR, Platform.CAMERA, Platform.SWITCH, Platform.SENSOR, Platform.UPDATE, Platform.SELECT)
+PLATFORMS: Final[tuple[Platform, ...]] = (
+    Platform.BINARY_SENSOR,
+    Platform.CAMERA,
+    Platform.SELECT,
+    Platform.SENSOR,
+    Platform.SWITCH,
+    Platform.UPDATE,
+)

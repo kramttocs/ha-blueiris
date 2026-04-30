@@ -7,13 +7,13 @@ import json
 import logging
 import re
 import time
-from collections.abc import Awaitable
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from json import JSONDecodeError
+from collections.abc import Awaitable
 from typing import Any
 
-import aiohttp
+
 from homeassistant.components import mqtt
 from homeassistant.components.mqtt import ReceiveMessage
 from homeassistant.config_entries import ConfigEntry
@@ -26,7 +26,6 @@ from homeassistant.const import (
     CONF_VERIFY_SSL,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -145,7 +144,6 @@ def _match_ai_categories(
 @dataclass(slots=True)
 class MqttEventState:
     """Snapshot of MQTT-derived state for a single camera event type."""
-    """All MQTT-derived state for a single key (topic + event_type)."""
 
     value: bool
     memo: str | None = None
@@ -172,7 +170,6 @@ class CameraLastMotionEvent:
 @dataclass(slots=True)
 class BlueIrisData:
     """Coordinator snapshot containing API data, status, cameras, and MQTT state."""
-    """Snapshot of Blue Iris state used by entities."""
 
     status: dict[str, Any]
     data: dict[str, Any]
@@ -283,13 +280,11 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
 
     def _clear_ai_motion_values(self, topic: str) -> None:
         """Clear memo-driven AI motion states for the supplied camera topic."""
-        """Clear AI category ON/OFF values without erasing memo/labels (keep-last behavior)."""
         for t in (AI_PERSON_MOTION, AI_VEHICLE_MOTION, AI_ANIMAL_MOTION):
             self._set_mqtt(mqtt_key(topic, t), value=False)
 
     def _rebuild_ai_label_sets(self) -> None:
         """Rebuild normalized AI label lookup sets from the current config."""
-        """Rebuild cached sets from the current config (list[str] options)."""
         self._ai_person_labels = set(_normalize_label_list(getattr(self._config, "ai_person_labels", None)))
         self._ai_vehicle_labels = set(_normalize_label_list(getattr(self._config, "ai_vehicle_labels", None)))
         self._ai_animal_labels = set(_normalize_label_list(getattr(self._config, "ai_animal_labels", None)))
@@ -307,14 +302,9 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
         k = mqtt_key(topic, category_key)
         self._set_mqtt(k, value=True, memo=memo, labels=labels_list, matched_labels=matched, ts=ts)
 
-
     def _still_image_url(self, camera_id: str) -> str:
         """Build the current still-image URL for a camera."""
-        session_id = self.api.session_id
-        base_url = self.api.base_url
-        if session_id:
-            return f"{base_url}/image/{camera_id}?session={session_id}"
-        return f"{base_url}/image/{camera_id}"
+        return self.api.still_image_url(camera_id)
 
     def get_last_motion_event(self, camera_id: str) -> CameraLastMotionEvent | None:
         """Return the latest tracked motion event for a camera, if any."""
@@ -374,36 +364,7 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
 
     async def async_fetch_camera_snapshot(self, camera_id: str) -> bytes | None:
         """Fetch the current still image bytes for a camera."""
-        url = self._still_image_url(camera_id)
-        if not url:
-            return None
-
-        session = async_get_clientsession(self.hass)
-        cfg = self.api.config
-        ssl = False if cfg.ssl and not cfg.verify_ssl else None
-        auth = aiohttp.BasicAuth(cfg.username, password=cfg.password) if (cfg.username and cfg.password) else None
-
-        for attempt in (0, 1):
-            try:
-                async with session.get(url, auth=auth, ssl=ssl) as resp:
-                    if resp.status in (401, 403):
-                        if attempt == 1:
-                            return None
-                        await self.api.login()
-                        continue
-                    if resp.status in (502, 503, 504):
-                        return None
-                    resp.raise_for_status()
-                    return await resp.read()
-            except asyncio.TimeoutError:
-                return None
-            except aiohttp.ClientError:
-                return None
-            except Exception:
-                _LOGGER.debug("Unexpected error fetching snapshot for %s", camera_id, exc_info=True)
-                return None
-
-        return None
+        return await self.api.fetch_camera_image(camera_id)
 
     def update_entry(self, entry: ConfigEntry) -> None:
         """Update config when options change."""
@@ -421,7 +382,6 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
 
     async def _async_refresh_after_settle(self) -> None:
         """Wait briefly after a write, then request a coordinator refresh."""
-        """Wait for writes to settle, then refresh once."""
         try:
             while True:
                 elapsed = time.monotonic() - self._last_write_monotonic
@@ -435,13 +395,27 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
 
     async def async_schedule_refresh_after_write(self) -> None:
         """Schedule a delayed refresh after a write has been issued to Blue Iris."""
-        """Schedule a refresh after the most recent write settles (coalescing)."""
         self._last_write_monotonic = time.monotonic()
         self._cancel_write_refresh_task()
-        self._write_refresh_task = asyncio.create_task(self._async_refresh_after_settle())
+        self._write_refresh_task = self.hass.async_create_task(
+            self._async_refresh_after_settle(),
+            name=f"{DOMAIN}_write_settle_refresh",
+        )
 
     async def async_write_and_refresh(self, write_awaitable: Awaitable[Any]) -> Any:
-        """Serialize writes and refresh once after the last write settles."""
+        """Serialize writes and refresh once after the last write settles.
+
+        Design notes:
+            - _write_lock ensures only one write is in-flight at a time, preventing
+            race conditions when the UI changes settings rapidly.
+            - async_schedule_refresh_after_write() is called inside the lock so
+            _last_write_monotonic is updated atomically after the write completes.
+            - The actual settle-wait task runs outside the lock. This is intentional;
+            the lock should not be held during the settle sleep.
+            - If another write arrives before the settle timer fires, the previous
+            timer is cancelled and the new write schedules a fresh one, coalescing
+            rapid writes into a single follow-up refresh.
+        """
         async with self._write_lock:
             result = await write_awaitable
             await self.async_schedule_refresh_after_write()
@@ -449,21 +423,23 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
 
     async def async_schedule_refresh(self) -> None:
         """Request a coordinator refresh without waiting for it to complete."""
-        """Schedule a short debounced refresh."""
         await self._refresh_debouncer.async_call()
 
     async def async_shutdown(self) -> None:
         """Unsubscribe MQTT and close API resources during integration unload."""
-        """Clean up resources."""
+        self._cancel_write_refresh_task()
+        self._mqtt_debouncer.async_shutdown()
+        self._refresh_debouncer.async_shutdown()
+
         if self._mqtt_unsub is not None:
             self._mqtt_unsub()
             self._mqtt_unsub = None
             self._mqtt_sub_topic = None
+
         await self.api.async_close()
 
     async def _ensure_mqtt_subscription(self) -> None:
         """Create the MQTT subscription when MQTT support is available and configured."""
-        """Subscribe to MQTT topics if MQTT integration is available."""
         if "mqtt" not in self.hass.config.components:
             _LOGGER.debug("MQTT not available, skipping Blue Iris MQTT subscription")
             return
@@ -498,13 +474,8 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
             self._mqtt_unsub = None
             self._mqtt_sub_topic = None
 
-    def _run_coro_threadsafe(self, coro: Awaitable[Any]) -> None:
-        """Schedule a coroutine on Home Assistant's loop from another thread."""
-        """Schedule a coroutine on the HA event loop from any thread."""
-        self.hass.loop.call_soon_threadsafe(self.hass.async_create_task, coro)
-
     async def _async_process_mqtt_message(self, topic: str, payload: dict[str, Any]) -> None:
-        """Process an MQTT message on the event loop (thread-safe)."""
+        """Process an MQTT message on the event loop."""
         parsed = parse_topic(topic)
         if parsed is None:
             return
@@ -712,7 +683,7 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
         )
             
     def process_mqtt_message(self, message: ReceiveMessage) -> None:
-        """Thread-safe entrypoint called by MQTT; hand off to event loop."""
+        """Decode an MQTT message and schedule async processing."""
         raw = message.payload
         if not raw:
             return
@@ -738,11 +709,13 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
             _LOGGER.debug("Ignoring non-dict JSON payload topic=%s payload=%r", message.topic, payload)
             return
 
-        self._run_coro_threadsafe(self._async_process_mqtt_message(message.topic, payload))
+        self.hass.async_create_task(
+            self._async_process_mqtt_message(message.topic, payload),
+            name=f"{DOMAIN}_mqtt_message",
+        )
 
     async def _async_push_mqtt_update(self) -> None:
         """Push updated MQTT state into coordinator data without polling the API."""
-        """Push MQTT cache changes to entities without hitting the API."""
         if self.data is None:
             return
 
