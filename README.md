@@ -1,4 +1,4 @@
-# Blue Iris NVR
+# Blue Iris
 
 ![HomeAssistant](https://img.shields.io/badge/Home%20Assistant-Custom%20Integration-blue.svg)
 ![Maintenance](https://img.shields.io/badge/Maintained-Yes-brightgreen.svg)
@@ -7,7 +7,7 @@
 
 Home Assistant integration for **Blue Iris Video Security Software**.
 
-This is/was designed (original design by elad-bar), reviewed, and tested by me. AI assisted in generating documentation and some logic/design patterns.
+This is/was designed (original design by elad-bar), reviewed, and tested by me. AI assisted.
 
 This integration allows Home Assistant to interact with your Blue Iris server, providing cameras, sensors, profile control, motion event tracking, snapshot support, and automation-friendly entities.
 
@@ -34,7 +34,8 @@ This integration allows Home Assistant to interact with your Blue Iris server, p
   - [Last Motion Event Sensors](#last-motion-event-sensors)
   - [Update Sensors](#update-sensors)
   - [Camera Entity](#camera-entity)
-  - [Profile Switches](#profile-switches)
+  - [Profile and Schedule Selects](#profile-and-schedule-selects)
+  - [Hold Profile Changes Switch](#hold-profile-changes-switch)
 - [Services](#services)
   - [Latest Motion Event Snapshot](#latest-motion-event-snapshot)
   - [Trigger Camera](#trigger-camera)
@@ -50,7 +51,7 @@ This integration allows Home Assistant to interact with your Blue Iris server, p
 
 Really appreciate the support team at Blue Iris Software.
 
-This integration builds upon the excellent work originally created by **elad-bar**. As he no longer uses Blue Iris, he granted permission to reuse ideas and concepts from the original project.
+This integration builds upon the excellent work originally created by **elad-bar**.
 
 ---
 
@@ -67,7 +68,7 @@ This integration builds upon the excellent work originally created by **elad-bar
 ## Installation via HACS
 
 1. Open **HACS**
-2. Search for **Blue Iris NVR**
+2. Search for **Blue Iris**
 3. Install the integration
 4. Restart Home Assistant if prompted
 
@@ -77,7 +78,7 @@ This integration builds upon the excellent work originally created by **elad-bar
 
 ## Basic Setup
 
-`Configuration → Integrations → Add Integration → BlueIris NVR`
+`Configuration → Integrations → Add Integration → Blue Iris`
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -92,23 +93,22 @@ This integration builds upon the excellent work originally created by **elad-bar
 
 # Integration Options
 
-`Configuration → Integrations → BlueIris NVR → Options`
+`Configuration → Integrations → Blue Iris → Options`
 
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | Log Level | Drop-down | Yes | Default | Sets integration logging level |
 | Stream Type | Drop-down | Yes | H264 | Defines the stream type |
 | Enable Camera Streaming | Toggle | Yes | False | Enables Home Assistant Stream component |
-| Hold Profile Change | Toggle | Yes | True | Determines if profile changes are held |
-| Allowed Cameras | Multi-select | No | — | Creates camera entities |
-| Profile Switches | Multi-select | No | — | Creates profile switches |
-| Schedule Switches | Multi-select | No | — | Creates schedule switches |
+| Allowed Cameras | Multi-select | No | — | Controls which Blue Iris cameras are exposed as camera entities |
+| Allowed Profiles | Multi-select | No | — | Controls which profiles are available in the Profile select |
+| Allowed Schedules | Multi-select | No | — | Controls which schedules are available in the Schedule select |
 
 ---
 
 # AI Label Mapping
 
-`Configuration → Integrations → BlueIris NVR → Options → Second Page`
+`Configuration → Integrations → Blue Iris → Options → Second Page`
 
 This page is only visible if at least one **Motion Sensor camera** is selected on the previous page.
 
@@ -197,17 +197,24 @@ Default state:
 Idle
 ```
 
-## Profile Switches
+## Profile and Schedule Selects
 
-Each selected profile creates a **switch under the Server device**.
+The **Server device** provides admin-only select entities for Blue Iris profile and schedule control.
 
-Only **one profile switch can be active at a time**.
+- **Profile** select: changes the active Blue Iris profile.
+- **Schedule** select: changes the active Blue Iris schedule.
 
-Behavior when turning a profile **off**:
+The available choices are controlled by the **Allowed Profiles** and **Allowed Schedules** options.
 
-- Turning off **Profile 1** activates **Profile 0**
-- Turning off **any other profile** activates **Profile 1**
+## Hold Profile Changes Switch
 
+The **Server device** also provides a **Hold Profile Changes** config switch.
+
+This switch does not immediately call Blue Iris when toggled. Instead, it controls how future profile changes behave:
+
+- When off, selecting a profile sends the profile change normally.
+- When on, selecting a profile uses Blue Iris hold behavior so the selected profile is held instead of being overridden by the schedule.
+  
 ---
 
 # Services
@@ -219,7 +226,7 @@ Fetch the latest snapshot for a camera and optionally save it locally.
 | Field | Required | Description |
 | --- | --- | --- |
 | `entity_id` | Yes | Camera entity |
-| `filename` | No | Optional filename stored in `/config/www/blueiris/` |
+| `filename` | No | Optional filename stored under `<config>/www/blueiris/` |
 
 If `filename` is omitted, the integration automatically uses:
 
@@ -238,7 +245,7 @@ target:
 Saved file:
 
 ```text
-/config/www/blueiris/driveway_latest_motion.jpg
+<config>/www/blueiris/driveway_latest_motion.jpg
 ```
 
 Accessible in Home Assistant as:
