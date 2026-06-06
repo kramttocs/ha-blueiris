@@ -19,6 +19,12 @@ from homeassistant.util import dt as dt_util
 from .coordinator import BlueIrisDataUpdateCoordinator
 from .helpers.device import server_device_name
 from .helpers.const import (
+    CONF_ALLOWED_CAMERA,
+    CONF_ALLOWED_MOTION_SENSOR,
+    CONF_ALLOWED_AUDIO_SENSOR,
+    CONF_ALLOWED_CONNECTIVITY_SENSOR,
+    CONF_ALLOWED_DIO_SENSOR,
+    CONF_ALLOWED_EXTERNAL_SENSOR,
     CONF_LOG_LEVEL,
     LOG_LEVEL_DEFAULT,
     DATA_SKIP_OPTIONS_RELOAD,
@@ -34,6 +40,15 @@ from .helpers.const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+_CAMERA_OPTION_KEYS = (
+    CONF_ALLOWED_CAMERA,
+    CONF_ALLOWED_MOTION_SENSOR,
+    CONF_ALLOWED_AUDIO_SENSOR,
+    CONF_ALLOWED_CONNECTIVITY_SENSOR,
+    CONF_ALLOWED_DIO_SENSOR,
+    CONF_ALLOWED_EXTERNAL_SENSOR,
+)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 TRIGGER_SCHEMA = vol.Schema({vol.Required("entity_id"): cv.entity_ids})
@@ -399,3 +414,62 @@ def _handle_log_level(entry: ConfigEntry) -> None:
         return
 
     logger.setLevel(level_int)
+
+
+def _selected_camera_ids(entry: ConfigEntry) -> set[str]:
+    """Return camera ids currently selected in any camera-based option."""
+    selected: set[str] = set()
+
+    for key in _CAMERA_OPTION_KEYS:
+        for camera_id in entry.options.get(key, []) or []:
+            selected.add(str(camera_id))
+
+    return selected
+
+
+def _camera_id_from_device_entry(
+    entry: ConfigEntry,
+    device_entry: dr.DeviceEntry,
+) -> str | None:
+    """Return the Blue Iris camera id for a camera device registry entry."""
+    server_identifier = f"{entry.entry_id}_server"
+    camera_prefix = f"{entry.entry_id}_cam_"
+
+    for domain, identifier in device_entry.identifiers:
+        if domain != DOMAIN:
+            continue
+
+        identifier = str(identifier)
+
+        # Do not allow removing the server device with camera cleanup logic.
+        if identifier == server_identifier:
+            return None
+
+        if identifier.startswith(camera_prefix):
+            return identifier.removeprefix(camera_prefix)
+
+    return None
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    device_entry: dr.DeviceEntry,
+) -> bool:
+    """Allow users to remove stale or deselected Blue Iris camera devices."""
+    camera_id = _camera_id_from_device_entry(entry, device_entry)
+    if camera_id is None:
+        return False
+
+    coordinator: BlueIrisDataUpdateCoordinator | None = hass.data.get(DOMAIN, {}).get(
+        entry.entry_id
+    )
+
+    # If Blue Iris no longer reports this camera, allow removal.
+    if coordinator is not None and coordinator.data is not None:
+        if camera_id not in coordinator.data.cameras:
+            return True
+
+    # If the camera is no longer selected anywhere in this integration's
+    # camera/sensor options, allow HA to remove the stale device entry.
+    return camera_id not in _selected_camera_ids(entry)
