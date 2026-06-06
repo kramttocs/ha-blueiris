@@ -126,6 +126,10 @@ This integration builds upon the excellent work originally created by **elad-bar
 | Allowed Profiles | Multi-select | No | — | Controls which profiles are available in the Profile select |
 | Allowed Schedules | Multi-select | No | — | Controls which schedules are available in the Schedule select |
 
+### Removing camera devices
+
+To remove a Blue Iris camera from Home Assistant, first remove that camera from all relevant integration options, such as Allowed Cameras, Motion Sensors, Connectivity Sensors, Audio Sensors, DIO Sensors, and External Sensors. Save the options and reload the integration. Once the integration no longer provides entities for that camera, Home Assistant will allow the camera device to be deleted from the device page.
+
 ---
 
 # AI Label Mapping
