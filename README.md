@@ -357,29 +357,31 @@ For full setup instructions, inputs, examples, and optional companion mute autom
 If you want a simple automation instead of the blueprint, here is a basic example that sends a notification when a motion event occurs and includes the latest snapshot. It's not setup to be generic but just an example.
 
 ```yaml
-alias: Blue Iris - Driveway notification
-mode: queued
-
-trigger:
-  - platform: state
-    entity_id: sensor.driveway_last_motion_event
-
-condition:
+alias: Blue Iris - Example Automation
+description: ""
+triggers:
+  - entity_id:
+      - sensor.home_recroom_last_motion_event
+    trigger: state
+conditions:
   - condition: template
     value_template: >
-      {{ trigger.to_state.state not in ['unknown','unavailable','none','idle','No event'] }}
-
-action:
-  - service: blueiris.latest_motion_event_snapshot
-    target:
-      entity_id: camera.driveway
-
-  - service: notify.mobile_app_your_phone
+      {{ trigger.to_state.state not in
+      ['unknown','unavailable','none','idle','No event'] }}
+actions:
+  - target:
+      entity_id:
+        - camera.home_recroom
+    action: blueiris.latest_motion_event_snapshot
+    data: {}
+  - action: notify.mobile_app_scotts_phone
+    metadata: {}
     data:
-      title: "Blue Iris: Driveway"
-      message: "{{ states('sensor.driveway_last_motion_event') }}"
       data:
-        image: "/local/blueiris/driveway_latest_motion.jpg?v={{ now().timestamp() }}"
+        image: /local/blueiris/recroom_latest_motion.jpg?v={{ now().timestamp() }}
+      title: RecRoom Test Automation
+      message: RecRoom Test Automation
+mode: queued
 ```
 
 ### Cache Busting
