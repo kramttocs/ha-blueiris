@@ -359,29 +359,31 @@ If you want a simple automation instead of the blueprint, here is a basic exampl
 ```yaml
 alias: Blue Iris - Example Automation
 description: ""
+mode: queued
+
 triggers:
-  - entity_id:
-      - sensor.home_recroom_last_motion_event
-    trigger: state
+  - trigger: state
+    entity_id:
+      - sensor.driveway_last_motion_event
+
 conditions:
   - condition: template
     value_template: >
-      {{ trigger.to_state.state not in
-      ['unknown','unavailable','none','idle','No event'] }}
+      {{ trigger.to_state.state not in ['unknown', 'unavailable', 'none', 'idle', 'No event'] }}
+
 actions:
-  - target:
+  - action: blueiris.latest_motion_event_snapshot
+    target:
       entity_id:
-        - camera.home_recroom
-    action: blueiris.latest_motion_event_snapshot
+        - camera.driveway
     data: {}
-  - action: notify.mobile_app_scotts_phone
-    metadata: {}
+
+  - action: notify.mobile_app_your_phone
     data:
+      title: "Blue Iris: Driveway"
+      message: "{{ states('sensor.driveway_last_motion_event') }}"
       data:
-        image: /local/blueiris/recroom_latest_motion.jpg?v={{ now().timestamp() }}
-      title: RecRoom Test Automation
-      message: RecRoom Test Automation
-mode: queued
+        image: "/local/blueiris/driveway_latest_motion.jpg?v={{ now().timestamp() }}"
 ```
 
 ### Cache Busting
