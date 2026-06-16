@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import logging
 from dataclasses import dataclass
-from datetime import UTC,datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import aiohttp
@@ -30,6 +30,7 @@ from ..helpers.const import (
     BI_ATTR_SYSTEM_NAME,
     BI_ATTR_IS_ENABLED,
     BI_ATTR_IS_ACTIVE,
+    DEFAULT_STREAM_TYPE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ class BlueIrisConfig:
     password: str
 
     # options used by entity setup (kept here for convenience)
-    stream_type: str = "H264"
+    stream_type: str = DEFAULT_STREAM_TYPE
     support_stream: bool = False
     hold_profile_changes: bool = True
     allowed_camera: list[str] | None = None
@@ -300,7 +301,7 @@ class BlueIrisApi:
             try:
                 async with self.session.post(
                     self.url,
-                    json = payload,
+                    json=payload,
                     ssl=self._ssl_param(),
                 ) as response:
                     response.raise_for_status()

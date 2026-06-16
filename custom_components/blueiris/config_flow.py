@@ -44,9 +44,8 @@ from .helpers.const import (
     DEFAULT_VEHICLE_LABELS,
     DEFAULT_ANIMAL_LABELS,
     CONF_STREAM_TYPE,
-    DEFAULT_STREAM_TYPE,
-    STREAM_TYPE_H264,
-    STREAM_TYPE_MJPG,
+    DEFAULT_STREAM_TYPE,    
+    STREAM_VIDEO,
     CONF_SUPPORT_STREAM,
     CONF_HOLD_PROFILE_CHANGES,
     DEFAULT_HOLD_PROFILE_CHANGES,
@@ -155,11 +154,11 @@ def _build_settings_schema(
                 mode=selector.SelectSelectorMode.DROPDOWN,
             )
         ),
-        vol.Required(CONF_STREAM_TYPE, default=defaults[CONF_STREAM_TYPE]): selector.SelectSelector(
+        vol.Required(CONF_STREAM_TYPE, default=defaults.get(CONF_STREAM_TYPE, DEFAULT_STREAM_TYPE),): selector.SelectSelector(
             selector.SelectSelectorConfig(
                 options=[
-                    selector.SelectOptionDict(value=STREAM_TYPE_H264, label=STREAM_TYPE_H264),
-                    selector.SelectOptionDict(value=STREAM_TYPE_MJPG, label=STREAM_TYPE_MJPG),
+                    selector.SelectOptionDict(value=value, label=value)
+                    for value in STREAM_VIDEO
                 ],
                 mode=selector.SelectSelectorMode.DROPDOWN,
             )
