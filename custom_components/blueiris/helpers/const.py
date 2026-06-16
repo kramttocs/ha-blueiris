@@ -42,12 +42,17 @@ CONF_SUPPORT_STREAM: Final[str] = "support_stream"
 # Keep as-is unless you also migrate existing stored options + translations.
 CONF_STREAM_TYPE: Final[str] = "stream-type"
 STREAM_TYPE_H264: Final[str] = "H264"
+STREAM_TYPE_H264_TS: Final[str] = "H264 TS"
+STREAM_TYPE_H264_RAW: Final[str] = "H264 Raw"
 STREAM_TYPE_MJPG: Final[str] = "MJPEG"
+
 DEFAULT_STREAM_TYPE: Final[str] = STREAM_TYPE_H264
 
 STREAM_VIDEO: Final[dict[str, dict[str, str]]] = {
     STREAM_TYPE_H264: {"file_name": "temp.m3u8", "stream_name": "h264"},
-    STREAM_TYPE_MJPG: {"stream_name": "mjpg"},
+    STREAM_TYPE_H264_TS: {"file_name": "temp.ts", "stream_name": "h264"},
+    STREAM_TYPE_H264_RAW: {"file_name": "temp.h264", "stream_name": "h264"},
+    STREAM_TYPE_MJPG: {"file_name": "video.mjpg", "stream_name": "mjpg"},
 }
 
 DOMAIN_STREAM: Final[str] = "stream"

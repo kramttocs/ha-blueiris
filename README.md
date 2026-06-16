@@ -126,6 +126,13 @@ This integration builds upon the excellent work originally created by **elad-bar
 | Allowed Profiles | Multi-select | No | — | Controls which profiles are available in the Profile select |
 | Allowed Schedules | Multi-select | No | — | Controls which schedules are available in the Schedule select |
 
+### Stream Type Notes
+
+- **H264** uses Blue Iris `temp.m3u8` / HLS and is the default.
+- **H264 TS** uses Blue Iris `temp.ts` and may work better for some users, especially Blue Iris cycle/group cameras.
+- If live streaming is disabled, Home Assistant falls back to still-image refresh behavior, which may appear choppy.
+- **H264 Raw** and **MJPEG** are experimental and may not behave as live streams in all Home Assistant camera views.
+
 ### Removing camera devices
 
 To remove a Blue Iris camera from Home Assistant, first remove that camera from all relevant integration options, such as Allowed Cameras, Motion Sensors, Connectivity Sensors, Audio Sensors, DIO Sensors, and External Sensors. Save the options and reload the integration. Once the integration no longer provides entities for that camera, Home Assistant will allow the camera device to be deleted from the device page.
