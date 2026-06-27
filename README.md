@@ -47,6 +47,7 @@ This integration allows Home Assistant to interact with your Blue Iris server, p
   - [Hold Profile Changes Switch](#hold-profile-changes-switch)
 - [Services](#services)
   - [Latest Motion Event Snapshot](#latest-motion-event-snapshot)
+  - [Current Camera Snapshot](#current-camera-snapshot)
   - [Trigger Camera](#trigger-camera)
   - [Move to Preset](#move-to-preset)
   - [Reload](#reload)
@@ -203,8 +204,8 @@ Example attributes:
 | `memo` | Raw memo from Blue Iris |
 | `labels` | AI labels detected |
 | `matched_labels` | Labels matching configured AI categories |
-| `snapshot_url` | Blue Iris still image URL |
-| `stored_path` | Path to the locally saved snapshot, if one has been saved |
+| `snapshot_url` | Blue Iris still image URL for the camera |
+| `stored_path` | Path to the locally saved latest motion-event snapshot, if one has been saved |
 
 When a new event occurs, the stored snapshot path is cleared until a new snapshot is saved.
 
@@ -259,7 +260,12 @@ This switch does not immediately call Blue Iris when toggled. Instead, it contro
 
 ## Latest Motion Event Snapshot
 
-Fetch the latest snapshot for a camera and optionally save it locally.
+Saves the latest Blue Iris alert image for a selected camera and returns motion event metadata.
+
+This service is intended for motion-event notifications. It uses Blue Iris alert data rather than a live camera still image, so the saved image should better match the most recent Blue Iris alert for that camera.
+
+> [!NOTE]
+> This currently fetches the latest Blue Iris alert image for the selected camera. It is not yet exact MQTT-event correlation. If another alert occurs before the service runs, Blue Iris may return that newer alert image.
 
 | Field | Required | Description |
 | --- | --- | --- |
@@ -292,6 +298,47 @@ Accessible in Home Assistant as:
 /local/blueiris/driveway_latest_motion.jpg
 ```
 
+The service response includes `snapshot_source: alert` so automations and debugging can confirm that an alert image was saved.
+
+## Current Camera Snapshot
+
+Saves the current live still image for a selected Blue Iris camera.
+
+Use this service when you want a current camera image rather than the latest Blue Iris alert image.
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `entity_id` | Yes | Camera entity |
+| `filename` | No | Optional filename stored under `<config>/www/blueiris/` |
+
+If `filename` is omitted, the integration automatically uses:
+
+```text
+<camera_id>_current.jpg
+```
+
+Example:
+
+```yaml
+service: blueiris.current_camera_snapshot
+target:
+  entity_id: camera.driveway
+```
+
+Saved file:
+
+```text
+<config>/www/blueiris/driveway_current.jpg
+```
+
+Accessible in Home Assistant as:
+
+```text
+/local/blueiris/driveway_current.jpg
+```
+
+The service response includes `snapshot_source: current` so automations and debugging can confirm that a live still image was saved.
+
 ## Trigger Camera
 
 Triggers a camera or camera group manually.
@@ -316,7 +363,7 @@ The blueprint uses the integration’s:
 
 - **Last Motion Event sensors**
 - **camera entities**
-- **latest motion event snapshot service**
+- **latest motion event snapshot service**, which saves the latest Blue Iris alert image
 
 to create alarm-aware and camera-specific motion notifications with optional mute support.
 
@@ -334,7 +381,7 @@ to create alarm-aware and camera-specific motion notifications with optional mut
   - `armed_away`
   - `armed_night`
   - `armed_vacation`
-- Snapshot image support using the integration’s saved latest motion-event image
+- Snapshot image support using the integration’s saved latest Blue Iris alert image
 - Optional dynamic dashboard navigation per camera
 - Optional mute action support using a helper and companion automations
 
@@ -361,7 +408,7 @@ For full setup instructions, inputs, examples, and optional companion mute autom
 
 # Example Automation
 
-If you want a simple automation instead of the blueprint, here is a basic example that sends a notification when a motion event occurs and includes the latest snapshot. It's not setup to be generic but just an example.
+If you want a simple automation instead of the blueprint, here is a basic example that sends a notification when a motion event occurs and includes the latest saved Blue Iris alert image. It's not setup to be generic but just an example.
 
 ```yaml
 alias: Blue Iris - Example Automation
