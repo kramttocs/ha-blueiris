@@ -222,6 +222,7 @@ def _current_camera_snapshot_payload(
         "saved_filename": filename,
         "saved_path": str(path),
         "local_snapshot_url": local_url,
+        "snapshot_url": local_url,
         "generated_at": dt_util.utcnow().isoformat(),
     }
 
@@ -246,6 +247,17 @@ def _single_entity_id_from_call(call: ServiceCall) -> str:
     return entity_id
 
 
+def _local_media_root(hass: HomeAssistant) -> Path:
+    """Return the Home Assistant local media source root."""
+    media_dirs = getattr(hass.config, "media_dirs", {})
+    local_media_dir = media_dirs.get("local")
+
+    if local_media_dir:
+        return Path(local_media_dir)
+
+    return Path("/media")
+
+
 def _snapshot_filename(camera_id: str, filename: str | None, suffix: str) -> str:
     """Return a safe snapshot filename."""
     if filename:
@@ -258,8 +270,8 @@ async def _save_snapshot_image(
     image: bytes,
     filename: str,
 ) -> tuple[Path, str]:
-    """Save image bytes under www/blueiris and return path + local URL."""
-    base_snapshot_dir = Path(hass.config.path("www", "blueiris"))
+    """Save image bytes under local media/blueiris and return path + media URL."""
+    base_snapshot_dir = _local_media_root(hass) / "blueiris"
     path = base_snapshot_dir / filename
 
     await hass.async_add_executor_job(
@@ -267,7 +279,7 @@ async def _save_snapshot_image(
     )
     await hass.async_add_executor_job(path.write_bytes, image)
 
-    return path, f"/local/blueiris/{filename}"
+    return path, f"/media/local/blueiris/{filename}"
 
 
 async def _async_handle_latest_motion_event_snapshot(

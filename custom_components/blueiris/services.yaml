@@ -52,8 +52,8 @@ latest_motion_event_snapshot:
       description: >
         Optional filename for the saved snapshot. If omitted, the integration
         will create one automatically, such as driveway_latest_motion.jpg.
-        Files are stored in the Home Assistant config directory under
-        www/blueiris and are available through /local/blueiris/.
+        Files are stored in the Home Assistant local media directory under
+        blueiris and are available through /media/local/blueiris/.
       required: false
       example: driveway_latest_motion.jpg
       selector:
@@ -72,8 +72,8 @@ current_camera_snapshot:
       description: >
         Optional filename for the saved snapshot. If omitted, the integration
         will create one automatically, such as driveway_current.jpg.
-        Files are stored in the Home Assistant config directory under
-        www/blueiris and are available through /local/blueiris/.
+        Files are stored in the Home Assistant local media directory under
+        blueiris and are available through /media/local/blueiris/.
       required: false
       example: driveway_current.jpg
       selector:

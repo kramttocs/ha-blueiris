@@ -270,7 +270,7 @@ This service is intended for motion-event notifications. It uses Blue Iris alert
 | Field | Required | Description |
 | --- | --- | --- |
 | `entity_id` | Yes | Camera entity |
-| `filename` | No | Optional filename stored under `<config>/www/blueiris/` |
+| `filename` | No | Optional filename stored under the Home Assistant local media directory under `blueiris/` |
 
 If `filename` is omitted, the integration automatically uses:
 
@@ -289,13 +289,13 @@ target:
 Saved file:
 
 ```text
-<config>/www/blueiris/driveway_latest_motion.jpg
+<media>/blueiris/driveway_latest_motion.jpg
 ```
 
 Accessible in Home Assistant as:
 
 ```text
-/local/blueiris/driveway_latest_motion.jpg
+/media/local/blueiris/driveway_latest_motion.jpg
 ```
 
 The service response includes `snapshot_source: alert` so automations and debugging can confirm that an alert image was saved.
@@ -309,7 +309,7 @@ Use this service when you want a current camera image rather than the latest Blu
 | Field | Required | Description |
 | --- | --- | --- |
 | `entity_id` | Yes | Camera entity |
-| `filename` | No | Optional filename stored under `<config>/www/blueiris/` |
+| `filename` | No | Optional filename stored under the Home Assistant local media directory under `blueiris/` |
 
 If `filename` is omitted, the integration automatically uses:
 
@@ -328,13 +328,13 @@ target:
 Saved file:
 
 ```text
-<config>/www/blueiris/driveway_current.jpg
+<media>/blueiris/driveway_current.jpg
 ```
 
 Accessible in Home Assistant as:
 
 ```text
-/local/blueiris/driveway_current.jpg
+/media/local/blueiris/driveway_current.jpg
 ```
 
 The service response includes `snapshot_source: current` so automations and debugging can confirm that a live still image was saved.
@@ -408,7 +408,7 @@ For full setup instructions, inputs, examples, and optional companion mute autom
 
 # Example Automation
 
-If you want a simple automation instead of the blueprint, here is a basic example that sends a notification when a motion event occurs and includes the latest saved Blue Iris alert image. It's not setup to be generic but just an example.
+If you want a simple automation instead of the blueprint, here is a basic example that sends a notification when a motion event occurs and includes the latest saved Blue Iris alert image. It is not set up to be generic; it is just an example for you to modify as needed.
 
 ```yaml
 alias: Blue Iris - Example Automation
@@ -437,7 +437,7 @@ actions:
       title: "Blue Iris: Driveway"
       message: "{{ states('sensor.driveway_last_motion_event') }}"
       data:
-        image: "/local/blueiris/driveway_latest_motion.jpg?v={{ now().timestamp() }}"
+        image: "/media/local/blueiris/driveway_latest_motion.jpg?v={{ now().timestamp() }}"
 ```
 
 ### Cache Busting
