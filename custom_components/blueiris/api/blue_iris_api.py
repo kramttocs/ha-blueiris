@@ -498,7 +498,7 @@ class BlueIrisApi:
         """Return a best-effort sortable timestamp from an alert record."""
         value = record.get("date")
 
-        if isinstance(value, int | float):
+        if isinstance(value, (int, float)):
             return float(value)
 
         if isinstance(value, str):
@@ -509,39 +509,37 @@ class BlueIrisApi:
 
         return 0.0
 
-    @staticmethod
-    def _alert_image_ref_from_record(record: dict[str, Any]) -> str | None:
-        """Return a Blue Iris /alerts reference for an alertlist record."""
-        path = record.get("path")
-
-        if isinstance(path, str) and path.strip():
-            ref = path.strip().replace("\\", "/").lstrip("/")
-
-            # Blue Iris alertlist returns path as @record.extension.
-            # The /alerts endpoint supports @record directly, so strip extension
-            # for database-locator references instead of guessing a JPEG filename.
-            if ref.startswith("@"):
-                return ref.split(".", 1)[0]
-
-            return ref
-
-        # Fallback: if BI saved alert JPEGs to disk, alertlist may include file.
-        file_value = record.get("file")
-        if isinstance(file_value, str) and file_value.strip():
-            return file_value.strip().replace("\\", "/").lstrip("/")
-
-        return None
-
+    
     def alert_image_url(self, alert_ref: str) -> str:
         """Build a Blue Iris alert image URL."""
         ref = quote(alert_ref.lstrip("/"), safe="@._-/")
         url = f"{self.base_url}/alerts/{ref}"
 
+        params = ["fulljpeg"]
+
         if self.session_id:
-            url = f"{url}?session={self.session_id}"
+            params.append(f"session={quote(self.session_id, safe='')}")
 
-        return url
+        return f"{url}?{'&'.join(params)}"
+    
+    @staticmethod
+    def _alert_image_refs_from_record(record: dict[str, Any]) -> list[str]:
+        """Return possible alert image references from an alertlist record."""
+        refs: list[str] = []
 
+        file_value = record.get("file")
+        if isinstance(file_value, str) and file_value.strip():
+            refs.append(file_value.strip().replace("\\", "/").lstrip("/"))
+
+        path = record.get("path")
+        if isinstance(path, str) and path.strip():
+            ref = path.strip().replace("\\", "/").lstrip("/")
+            if ref.startswith("@"):
+                ref = ref.split(".", 1)[0]
+            refs.append(ref)
+
+        return list(dict.fromkeys(refs))
+    
     async def fetch_latest_alert_record(
         self,
         camera_id: str,
@@ -560,6 +558,12 @@ class BlueIrisApi:
         )
 
         records = self._alert_records_from_response(resp)
+        _LOGGER.debug(
+            "Blue Iris alertlist for %s returned %s records",
+            camera_id,
+            len(records),
+        )
+
         if not records:
             return None
 
@@ -611,8 +615,9 @@ class BlueIrisApi:
 
                     if resp.status in (404, 410):
                         _LOGGER.debug(
-                            "Blue Iris alert image not found for %s: HTTP %s",
+                            "Blue Iris alert image not found for ref=%s url=%s: HTTP %s",
                             alert_ref,
+                            url,
                             resp.status,
                         )
                         return None
@@ -662,13 +667,28 @@ class BlueIrisApi:
         if record is None:
             return None, None, None
 
-        alert_ref = self._alert_image_ref_from_record(record)
-        if alert_ref is None:
+        alert_refs = self._alert_image_refs_from_record(record)
+        if not alert_refs:
             return None, record, None
 
-        image = await self.fetch_alert_image(alert_ref)
-        return image, record, alert_ref
+        for alert_ref in alert_refs:
+            _LOGGER.debug(
+                "Trying Blue Iris alert image ref for %s: %s",
+                camera_id,
+                alert_ref,
+            )
+            
+            image = await self.fetch_alert_image(alert_ref)
+            if image is not None:
+                return image, record, alert_ref
 
+            _LOGGER.debug(
+                "Blue Iris alert image fetch failed for %s using ref=%s; trying next ref",
+                camera_id,
+                alert_ref,
+            )
+
+        return None, record, alert_refs[0]
 
     async def fetch_status(self) -> dict[str, Any]:
         """Fetch current status data from Blue Iris (stateless return)."""
