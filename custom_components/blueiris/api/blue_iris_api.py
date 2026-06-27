@@ -39,6 +39,8 @@ _LOGGER = logging.getLogger(__name__)
 DEFAULT_TIMEOUT = ClientTimeout(total=10)
 MAX_RETRIES = 3
 RETRY_DELAY = 1  # seconds
+ALERTLIST_LOOKBACK_SECONDS = 24 * 60 * 60
+ALERTLIST_CLOCK_SKEW_SECONDS = 5 *60
 
 
 @dataclass(slots=True)
@@ -545,11 +547,15 @@ class BlueIrisApi:
         camera_id: str,
     ) -> dict[str, Any] | None:
         """Fetch the latest Blue Iris alert record for a camera."""
+        now = int(datetime.now(UTC).timestamp())
+
         resp = await self.verified_post(
             {
                 "cmd": "alertlist",
                 "camera": camera_id,
                 "view": "alerts",
+                "startdate": now - ALERTLIST_LOOKBACK_SECONDS,
+                "enddate": now + ALERTLIST_CLOCK_SKEW_SECONDS,
             }
         )
 
