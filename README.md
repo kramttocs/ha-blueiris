@@ -387,13 +387,13 @@ to create alarm-aware and camera-specific motion notifications with optional mut
 
 ### Install Blueprint
 
-[![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://raw.githubusercontent.com/kramttocs/ha-blueprints/main/Automations/blueiris-last-event-notifications.yaml)
+[![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://raw.githubusercontent.com/kramttocs/ha-blueprints/main/Automations/blueiris-last-motion-event-notifications.yaml)
 
 ### Full Blueprint Documentation
 
 For full setup instructions, inputs, examples, and optional companion mute automations, see the blueprint documentation in the **ha-blueprints** repository:
 
-- Blueprint source: [`Automations/blueiris-last-event-notifications.yaml`](https://github.com/kramttocs/ha-blueprints/blob/main/Automations/blueiris-last-event-notifications.yaml)
+- Blueprint source: [`Automations/blueiris-last-motion-event-notifications.yaml`](https://github.com/kramttocs/ha-blueprints/blob/main/Automations/blueiris-last-motion-event-notifications.yaml)
 - Blueprint documentation: [`https://github.com/kramttocs/ha-blueprints`](https://github.com/kramttocs/ha-blueprints/tree/main)
 
 ### Notes
