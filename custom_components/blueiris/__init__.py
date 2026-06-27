@@ -305,8 +305,8 @@ async def _async_handle_latest_motion_event_snapshot(
     )
 
     coordinator.set_last_motion_event_stored_path(camera_id, str(path))
-
     payload = _latest_motion_event_payload(coordinator, camera_id)
+
     payload["snapshot_source"] = "alert"
     payload["saved_filename"] = filename
     payload["saved_path"] = str(path)
@@ -315,6 +315,15 @@ async def _async_handle_latest_motion_event_snapshot(
     payload["snapshot_url"] = local_url
     payload["alert_ref"] = alert_ref
     payload["alert_record"] = alert_record
+
+    if alert_record:
+        payload["alert_memo"] = alert_record.get("memo")
+        payload["alert_date"] = alert_record.get("date")
+        payload["alert_file"] = alert_record.get("file")
+        payload["alert_clip"] = alert_record.get("clip")
+        payload["alert_offset"] = alert_record.get("offset")
+        payload["alert_msec"] = alert_record.get("msec")
+        payload["alert_res"] = alert_record.get("res")
 
     return payload
 

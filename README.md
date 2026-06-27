@@ -33,7 +33,7 @@ This integration allows Home Assistant to interact with your Blue Iris server, p
 - [Credit](#credit)
 - [Installation and Setup](#installation-and-setup)
   - [Requirements](#requirements)
-  - [Installation via HACS](#installation-via-hacs)
+  - [Installation via HACS Custom Repository](#installation-via-hacs-custom-repository)
 - [Integration Configuration](#integration-configuration)
   - [Basic Setup](#basic-setup)
 - [Integration Options](#integration-options)
