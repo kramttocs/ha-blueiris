@@ -48,6 +48,7 @@ This integration allows Home Assistant to interact with your Blue Iris server, p
 - [Services](#services)
   - [Latest Motion Event Snapshot](#latest-motion-event-snapshot)
   - [Current Camera Snapshot](#current-camera-snapshot)
+  - [Snapshot URLs and Notification Behavior](#snapshot-urls-and-notification-behavior)
   - [Trigger Camera](#trigger-camera)
   - [Move to Preset](#move-to-preset)
   - [Reload](#reload)
@@ -267,10 +268,15 @@ This service is intended for motion-event notifications. It uses Blue Iris alert
 > [!NOTE]
 > This currently fetches the latest Blue Iris alert image for the selected camera. It is not yet exact MQTT-event correlation. If another alert occurs before the service runs, Blue Iris may return that newer alert image.
 
+The service prefers Blue Iris alert JPEG files and requests the full JPEG image when available. If a saved alert JPEG is not available, it falls back to the Blue Iris alert record reference.
+
+To receive hi-res alert images, Blue Iris must be configured to save alert JPEGs for the camera.
+
 | Field | Required | Description |
 | --- | --- | --- |
 | `entity_id` | Yes | Camera entity |
 | `filename` | No | Optional filename stored under the Home Assistant local media directory under `blueiris/` |
+| `create_public_copy` | No | Also save a copy under `/config/www/blueiris` and return `public_snapshot_url`. This is useful for legacy notification clickAction URLs, but the public copy is accessible without Home Assistant authentication via `/local/blueiris/`. Default is `false`. |
 
 If `filename` is omitted, the integration automatically uses:
 
@@ -298,7 +304,49 @@ Accessible in Home Assistant as:
 /media/local/blueiris/driveway_latest_motion.jpg
 ```
 
-The service response includes `snapshot_source: alert` so automations and debugging can confirm that an alert image was saved.
+Example with optional public copy:
+
+```yaml
+service: blueiris.latest_motion_event_snapshot
+target:
+  entity_id: camera.driveway
+data:
+  create_public_copy: true
+```
+
+When `create_public_copy` is enabled, an additional copy is saved to:
+
+```text
+/config/www/blueiris/driveway_latest_motion.jpg
+```
+
+and returned as:
+
+```text
+/local/blueiris/driveway_latest_motion.jpg
+```
+
+Useful response fields include:
+
+```yaml
+snapshot_source: alert
+snapshot_url: /media/local/blueiris/driveway_latest_motion.jpg
+local_snapshot_url: /media/local/blueiris/driveway_latest_motion.jpg
+saved_path: /media/blueiris/driveway_latest_motion.jpg
+saved_filename: driveway_latest_motion.jpg
+alert_ref: ...
+alert_record: ...
+alert_memo: ...
+alert_file: ...
+alert_clip: ...
+alert_offset: ...
+alert_msec: ...
+alert_res: ...
+public_snapshot_url: /local/blueiris/driveway_latest_motion.jpg
+public_saved_path: /config/www/blueiris/driveway_latest_motion.jpg
+```
+
+`public_snapshot_url` and `public_saved_path` are only returned when `create_public_copy: true` is used.
 
 ## Current Camera Snapshot
 
@@ -310,6 +358,7 @@ Use this service when you want a current camera image rather than the latest Blu
 | --- | --- | --- |
 | `entity_id` | Yes | Camera entity |
 | `filename` | No | Optional filename stored under the Home Assistant local media directory under `blueiris/` |
+| `create_public_copy` | No | Also save a copy under `/config/www/blueiris` and return `public_snapshot_url`. This is useful for legacy notification clickAction URLs, but the public copy is accessible without Home Assistant authentication via `/local/blueiris/`. Default is `false`. |
 
 If `filename` is omitted, the integration automatically uses:
 
@@ -337,7 +386,61 @@ Accessible in Home Assistant as:
 /media/local/blueiris/driveway_current.jpg
 ```
 
+Example with optional public copy:
+
+```yaml
+service: blueiris.current_camera_snapshot
+target:
+  entity_id: camera.driveway
+data:
+  create_public_copy: true
+```
+
 The service response includes `snapshot_source: current` so automations and debugging can confirm that a live still image was saved.
+
+## Snapshot URLs and Notification Behavior
+
+Snapshot services save the primary image under Home Assistant local media and return:
+
+```text
+/media/local/blueiris/...
+```
+
+This is the recommended default because local media is protected by Home Assistant authentication.
+
+Telegram and Companion App notifications handle images differently:
+
+- Telegram notifications should use `saved_path`. Home Assistant reads the local file and uploads the actual photo to Telegram.
+- Companion App notifications should use `snapshot_url` or `local_snapshot_url`. The mobile device must be able to reach Home Assistant to load the image.
+
+Example Telegram image field:
+
+```yaml
+file: "{{ bi_snapshot.saved_path }}"
+```
+
+Example Companion App image field:
+
+```yaml
+image: "{{ bi_snapshot.snapshot_url }}?v={{ now().timestamp() }}"
+```
+
+If Home Assistant is not externally accessible and the phone is away from the local network without VPN, Tailscale, Nabu Casa, or another remote-access method, the Companion App notification may still arrive but the image may not display.
+
+For legacy/custom automations that need a raw public image URL, use:
+
+```yaml
+create_public_copy: true
+```
+
+This returns:
+
+```yaml
+public_snapshot_url: /local/blueiris/...
+public_saved_path: /config/www/blueiris/...
+```
+
+Public copies are accessible without Home Assistant authentication. Only enable this when you understand the privacy tradeoff.
 
 ## Trigger Camera
 
@@ -419,6 +522,7 @@ triggers:
   - trigger: state
     entity_id:
       - sensor.driveway_last_motion_event
+    attribute: last_detection
 
 conditions:
   - condition: template
@@ -428,16 +532,53 @@ conditions:
 actions:
   - action: blueiris.latest_motion_event_snapshot
     target:
-      entity_id:
-        - camera.driveway
-    data: {}
+      entity_id: camera.driveway
+    response_variable: bi_snapshot
 
   - action: notify.mobile_app_your_phone
     data:
       title: "Blue Iris: Driveway"
       message: "{{ states('sensor.driveway_last_motion_event') }}"
       data:
-        image: "/media/local/blueiris/driveway_latest_motion.jpg?v={{ now().timestamp() }}"
+        image: "{{ bi_snapshot.snapshot_url }}?v={{ now().timestamp() }}"
+```
+
+### Optional Public ClickAction Example
+
+If you need a public raw image URL for a Companion App clickAction, enable `create_public_copy`.
+
+```yaml
+alias: Blue Iris - Example Automation with Public ClickAction
+description: ""
+mode: queued
+
+triggers:
+  - trigger: state
+    entity_id:
+      - sensor.driveway_last_motion_event
+    attribute: last_detection
+
+conditions:
+  - condition: template
+    value_template: >
+      {{ trigger.to_state.state not in ['unknown', 'unavailable', 'none', 'idle', 'No event'] }}
+
+actions:
+  - action: blueiris.latest_motion_event_snapshot
+    target:
+      entity_id: camera.driveway
+    data:
+      create_public_copy: true
+    response_variable: bi_snapshot
+
+  - action: notify.mobile_app_your_phone
+    data:
+      title: "Blue Iris: Driveway"
+      message: "{{ states('sensor.driveway_last_motion_event') }}"
+      data:
+        image: "{{ bi_snapshot.snapshot_url }}?v={{ now().timestamp() }}"
+        clickAction: "{{ bi_snapshot.public_snapshot_url }}?v={{ now().timestamp() }}"
+        url: "{{ bi_snapshot.public_snapshot_url }}?v={{ now().timestamp() }}"
 ```
 
 ### Cache Busting
@@ -447,3 +588,4 @@ Adding a timestamp ensures the newest snapshot is always displayed:
 ```text
 ?v={{ now().timestamp() }}
 ```
+
