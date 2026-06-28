@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from homeassistant.const import Platform
 from typing import Final
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+from homeassistant.const import Platform
 
 DOMAIN: Final[str] = "blueiris"
 DEFAULT_NAME: Final[str] = "BlueIris"
@@ -73,6 +73,7 @@ SERVICE_RELOAD_ENTRY_ID: Final[str] = "entry_id"
 SERVICE_LATEST_MOTION_EVENT_SNAPSHOT: Final[str] = "latest_motion_event_snapshot"
 SERVICE_CURRENT_CAMERA_SNAPSHOT: Final[str] = "current_camera_snapshot"
 SERVICE_SNAPSHOT_FILENAME: Final[str] = "filename"
+SERVICE_CREATE_PUBLIC_COPY: Final[str] = "create_public_copy"
 
 
 ATTR_ADMIN_PROFILE: Final[str] = "Profile"

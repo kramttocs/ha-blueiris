@@ -31,6 +31,7 @@ from .helpers.const import (
     DEFAULT_NAME,
     DOMAIN,
     PLATFORMS,
+    SERVICE_CREATE_PUBLIC_COPY,
     SERVICE_MOVE_TO_PRESET,
     SERVICE_TRIGGER_CAMERA,
     SERVICE_RELOAD,
@@ -64,12 +65,14 @@ LATEST_MOTION_EVENT_SNAPSHOT_SCHEMA = vol.Schema(
     {
         vol.Optional("entity_id"): vol.Any(cv.entity_id, [cv.entity_id]),
         vol.Optional(SERVICE_SNAPSHOT_FILENAME): cv.string,
+        vol.Optional(SERVICE_CREATE_PUBLIC_COPY, default=False): cv.boolean,
     }
 )
 CURRENT_CAMERA_SNAPSHOT_SCHEMA = vol.Schema(
     {
         vol.Optional("entity_id"): vol.Any(cv.entity_id, [cv.entity_id]),
         vol.Optional(SERVICE_SNAPSHOT_FILENAME): cv.string,
+        vol.Optional(SERVICE_CREATE_PUBLIC_COPY, default=False): cv.boolean,
     }
 )
 
@@ -282,6 +285,23 @@ async def _save_snapshot_image(
     return path, f"/media/local/blueiris/{filename}"
 
 
+async def _save_public_snapshot_copy(
+    hass: HomeAssistant,
+    image: bytes,
+    filename: str,
+) -> tuple[Path, str]:
+    """Save image bytes under www/blueiris and return path + public URL."""
+    base_snapshot_dir = Path(hass.config.path("www", "blueiris"))
+    path = base_snapshot_dir / filename
+
+    await hass.async_add_executor_job(
+        partial(path.parent.mkdir, parents=True, exist_ok=True)
+    )
+    await hass.async_add_executor_job(path.write_bytes, image)
+
+    return path, f"/local/blueiris/{filename}"
+
+
 async def _async_handle_latest_motion_event_snapshot(
     hass: HomeAssistant, call: ServiceCall
 ) -> dict[str, Any]:
@@ -308,6 +328,16 @@ async def _async_handle_latest_motion_event_snapshot(
         )
 
     path, local_url = await _save_snapshot_image(hass, image, filename)
+
+    public_path: Path | None = None
+    public_url: str | None = None
+
+    if call.data.get(SERVICE_CREATE_PUBLIC_COPY, False):
+        public_path, public_url = await _save_public_snapshot_copy(
+            hass,
+            image,
+            filename,
+        )
 
     _LOGGER.debug(
         "Saved latest Blue Iris alert snapshot for %s to %s using alert_ref=%s",
@@ -336,6 +366,10 @@ async def _async_handle_latest_motion_event_snapshot(
         payload["alert_offset"] = alert_record.get("offset")
         payload["alert_msec"] = alert_record.get("msec")
         payload["alert_res"] = alert_record.get("res")
+
+    if public_path is not None and public_url is not None:
+        payload["public_saved_path"] = str(public_path)
+        payload["public_snapshot_url"] = public_url
 
     return payload
 
@@ -366,15 +400,31 @@ async def _async_handle_current_camera_snapshot(
 
     path, local_url = await _save_snapshot_image(hass, image, filename)
 
+    public_path: Path | None = None
+    public_url: str | None = None
+
+    if call.data.get(SERVICE_CREATE_PUBLIC_COPY, False):
+        public_path, public_url = await _save_public_snapshot_copy(
+            hass,
+            image,
+            filename,
+        )
+
     _LOGGER.debug("Saved current Blue Iris snapshot for %s to %s", entity_id, path)
 
-    return _current_camera_snapshot_payload(
+    payload = _current_camera_snapshot_payload(
         coordinator,
         camera_id,
         filename=filename,
         path=path,
         local_url=local_url,
     )
+
+    if public_path is not None and public_url is not None:
+        payload["public_saved_path"] = str(public_path)
+        payload["public_snapshot_url"] = public_url
+
+    return payload
 
 
 async def async_setup(_hass: HomeAssistant, _config: dict) -> bool:

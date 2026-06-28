@@ -58,6 +58,16 @@ latest_motion_event_snapshot:
       example: driveway_latest_motion.jpg
       selector:
         text:
+    create_public_copy:
+      name: Create public copy
+      description: >-
+        Also save a copy under /config/www/blueiris and return public_snapshot_url.
+        This is useful for legacy notification clickAction URLs, but the public copy
+        is accessible without Home Assistant authentication via /local/blueiris/.
+      required: false
+      example: false
+      selector:
+        boolean:
 
 current_camera_snapshot:
   name: Current Camera Snapshot
@@ -78,3 +88,13 @@ current_camera_snapshot:
       example: driveway_current.jpg
       selector:
         text:
+    create_public_copy:
+      name: Create public copy
+      description: >-
+        Also save a copy under /config/www/blueiris and return public_snapshot_url.
+        This is useful for legacy notification clickAction URLs, but the public copy
+        is accessible without Home Assistant authentication via /local/blueiris/.
+      required: false
+      example: false
+      selector:
+        boolean:
