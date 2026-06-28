@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import quote
 
 import aiohttp
 from aiohttp import ClientSession, ClientTimeout
@@ -38,6 +39,8 @@ _LOGGER = logging.getLogger(__name__)
 DEFAULT_TIMEOUT = ClientTimeout(total=10)
 MAX_RETRIES = 3
 RETRY_DELAY = 1  # seconds
+ALERTLIST_LOOKBACK_SECONDS = 24 * 60 * 60
+ALERTLIST_CLOCK_SKEW_SECONDS = 5 * 60
 
 
 @dataclass(slots=True)
@@ -473,6 +476,219 @@ class BlueIrisApi:
                 return None
 
         return None
+    
+    @staticmethod
+    def _alert_records_from_response(resp: dict[str, Any]) -> list[dict[str, Any]]:
+        """Return alert records from a Blue Iris alertlist response."""
+        data = resp.get("data")
+
+        if isinstance(data, list):
+            return [item for item in data if isinstance(item, dict)]
+
+        if isinstance(data, dict):
+            for key in ("alerts", "items", "records"):
+                value = data.get(key)
+                if isinstance(value, list):
+                    return [item for item in value if isinstance(item, dict)]
+
+        return []
+
+    @staticmethod
+    def _alert_record_sort_value(record: dict[str, Any]) -> float:
+        """Return a best-effort sortable timestamp from an alert record."""
+        value = record.get("date")
+
+        if isinstance(value, (int, float)):
+            return float(value)
+
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except ValueError:
+                return 0.0
+
+        return 0.0
+
+    
+    def alert_image_url(self, alert_ref: str) -> str:
+        """Build a Blue Iris alert image URL."""
+        ref = quote(alert_ref.lstrip("/"), safe="@._-/")
+        url = f"{self.base_url}/alerts/{ref}"
+
+        params = ["fulljpeg"]
+
+        if self.session_id:
+            params.append(f"session={quote(self.session_id, safe='')}")
+
+        return f"{url}?{'&'.join(params)}"
+    
+    @staticmethod
+    def _alert_image_refs_from_record(record: dict[str, Any]) -> list[str]:
+        """Return possible alert image references from an alertlist record."""
+        refs: list[str] = []
+
+        file_value = record.get("file")
+        if isinstance(file_value, str) and file_value.strip():
+            refs.append(file_value.strip().replace("\\", "/").lstrip("/"))
+
+        path = record.get("path")
+        if isinstance(path, str) and path.strip():
+            ref = path.strip().replace("\\", "/").lstrip("/")
+            if ref.startswith("@"):
+                ref = ref.split(".", 1)[0]
+            refs.append(ref)
+
+        return list(dict.fromkeys(refs))
+    
+    async def fetch_latest_alert_record(
+        self,
+        camera_id: str,
+    ) -> dict[str, Any] | None:
+        """Fetch the latest Blue Iris alert record for a camera."""
+        now = int(datetime.now(UTC).timestamp())
+
+        resp = await self.verified_post(
+            {
+                "cmd": "alertlist",
+                "camera": camera_id,
+                "view": "alerts",
+                "startdate": now - ALERTLIST_LOOKBACK_SECONDS,
+                "enddate": now + ALERTLIST_CLOCK_SKEW_SECONDS,
+            }
+        )
+
+        records = self._alert_records_from_response(resp)
+        _LOGGER.debug(
+            "Blue Iris alertlist for %s returned %s records",
+            camera_id,
+            len(records),
+        )
+
+        if not records:
+            return None
+
+        return max(
+            enumerate(records),
+            key=lambda item: (self._alert_record_sort_value(item[1]), -item[0]),
+        )[1]
+
+    async def fetch_alert_image(self, alert_ref: str) -> bytes | None:
+        """Fetch a Blue Iris alert image by alert reference or filename."""
+        await self.ensure_session()
+
+        auth = (
+            aiohttp.BasicAuth(self._config.username, password=self._config.password)
+            if self._config.username and self._config.password
+            else None
+        )
+
+        for attempt in (0, 1):
+            url = self.alert_image_url(alert_ref)
+
+            try:
+                async with self.session.get(
+                    url,
+                    auth=auth,
+                    ssl=self._ssl_param(),
+                ) as resp:
+                    if resp.status in (401, 403):
+                        if attempt == 1:
+                            return None
+
+                        _LOGGER.debug(
+                            "Alert image auth error (%s) for %s; re-authenticating once.",
+                            resp.status,
+                            alert_ref,
+                        )
+                        try:
+                            self.is_logged_in = False
+                            self.session_id = None
+                            await self.login()
+                        except Exception:  # noqa: BLE001
+                            _LOGGER.debug(
+                                "Re-authentication failed while fetching alert image %s",
+                                alert_ref,
+                                exc_info=True,
+                            )
+                            return None
+                        continue
+
+                    if resp.status in (404, 410):
+                        _LOGGER.debug(
+                            "Blue Iris alert image not found for ref=%s url=%s: HTTP %s",
+                            alert_ref,
+                            url,
+                            resp.status,
+                        )
+                        return None
+
+                    if resp.status in (502, 503, 504):
+                        _LOGGER.debug(
+                            "Transient alert image error (%s) for %s; returning None.",
+                            resp.status,
+                            alert_ref,
+                        )
+                        return None
+
+                    resp.raise_for_status()
+                    return await resp.read()
+
+            except asyncio.TimeoutError:
+                _LOGGER.debug("Timeout fetching alert image for %s", alert_ref)
+                return None
+
+            except aiohttp.ClientError as err:
+                _LOGGER.debug(
+                    "Transport error fetching alert image for %s: %s",
+                    alert_ref,
+                    err,
+                )
+                return None
+
+            except Exception:  # noqa: BLE001
+                _LOGGER.debug(
+                    "Unexpected error fetching alert image for %s",
+                    alert_ref,
+                    exc_info=True,
+                )
+                return None
+
+        return None
+
+    async def fetch_latest_alert_image(
+        self,
+        camera_id: str,
+    ) -> tuple[bytes | None, dict[str, Any] | None, str | None]:
+        """Fetch the latest Blue Iris alert image for a camera.
+
+        Returns image bytes, alert record, and alert reference.
+        """
+        record = await self.fetch_latest_alert_record(camera_id)
+        if record is None:
+            return None, None, None
+
+        alert_refs = self._alert_image_refs_from_record(record)
+        if not alert_refs:
+            return None, record, None
+
+        for alert_ref in alert_refs:
+            _LOGGER.debug(
+                "Trying Blue Iris alert image ref for %s: %s",
+                camera_id,
+                alert_ref,
+            )
+            
+            image = await self.fetch_alert_image(alert_ref)
+            if image is not None:
+                return image, record, alert_ref
+
+            _LOGGER.debug(
+                "Blue Iris alert image fetch failed for %s using ref=%s; trying next ref",
+                camera_id,
+                alert_ref,
+            )
+
+        return None, record, alert_refs[0]
 
     async def fetch_status(self) -> dict[str, Any]:
         """Fetch current status data from Blue Iris (stateless return)."""
