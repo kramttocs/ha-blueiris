@@ -33,7 +33,7 @@ This integration allows Home Assistant to interact with your Blue Iris server, p
 - [Credit](#credit)
 - [Installation and Setup](#installation-and-setup)
   - [Requirements](#requirements)
-  - [Installation via HACS Custom Repository](#installation-via-hacs-custom-repository)
+  - [Installation via HACS](#installation-via-hacs)
 - [Integration Configuration](#integration-configuration)
   - [Basic Setup](#basic-setup)
 - [Integration Options](#integration-options)
@@ -76,25 +76,16 @@ This integration builds upon the excellent work originally created by **elad-bar
 - To control **Profiles**, the user must have **Admin permissions**
 - **MQTT integration (optional)** for real-time event updates
 
-## Installation via HACS Custom Repository
-
-> [!NOTE]
-> This integration is currently installed through HACS as a **custom repository**. It is not yet available in the default HACS repository list.
+## Installation via HACS
 
 1. Open **HACS**
-2. Open the **three-dot menu** in the top-right corner
-3. Select **Custom repositories**
-4. Add this repository URL:
-
-   ```text
-   https://github.com/kramttocs/ha-blueiris
-   ```
-
-5. Set the category to **Integration**
-6. Click **Add**
-7. Search for **Blue Iris** in HACS
-8. Install the integration
-9. Restart Home Assistant if prompted
+2. Search for **Blue Iris**
+3. Select **Blue Iris**
+4. Click **Download**
+5. Restart Home Assistant if prompted
+6. Go to **Settings → Devices & services → Add integration**
+7. Search for **Blue Iris**
+8. Complete the integration setup
 
 ---
 
