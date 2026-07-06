@@ -41,7 +41,7 @@ reload:
 
 latest_motion_event_snapshot:
   name: Latest Motion Event Snapshot
-  description: Saves the latest Blue Iris alert image for the selected camera and returns motion event metadata.
+  description: Saves the latest Blue Iris alert image for the selected camera and returns motion event metadata. The alert search currently looks back up to 24 hours.
   target:
     entity:
       integration: blueiris

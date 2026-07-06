@@ -369,10 +369,10 @@ class BlueIrisApi:
         cmd = payload.get("cmd")
         res = result.get("result")
         _LOGGER.debug(
-            "Blue Iris cmd=%s result=%s session_id=%r",
+            "Blue Iris cmd=%s result=%s has_session=%s",
             cmd,
             res,
-            self.session_id,
+            self.session_id is not None,
         )
 
         if res != "fail":
@@ -383,10 +383,10 @@ class BlueIrisApi:
         reason_l = str(raw_reason).lower()
 
         _LOGGER.warning(
-            "Blue Iris cmd=%s returned fail. reason=%r session_id=%r",
+            "Blue Iris cmd=%s returned fail. reason=%r has_session=%s",
             cmd,
             raw_reason,
-            self.session_id,
+            self.session_id is not None,
         )
 
         auth_fail = self._is_auth_failure(reason_l)
@@ -478,8 +478,15 @@ class BlueIrisApi:
         return None
     
     @staticmethod
-    def _alert_records_from_response(resp: dict[str, Any]) -> list[dict[str, Any]]:
+    def _alert_records_from_response(resp: dict[str, Any] | None) -> list[dict[str, Any]]:
         """Return alert records from a Blue Iris alertlist response."""
+        if not isinstance(resp, dict):
+            _LOGGER.debug(
+                "Blue Iris alertlist response was not a dict: %s",
+                type(resp).__name__,
+            )
+            return []
+
         data = resp.get("data")
 
         if isinstance(data, list):
@@ -491,6 +498,16 @@ class BlueIrisApi:
                 if isinstance(value, list):
                     return [item for item in value if isinstance(item, dict)]
 
+            _LOGGER.debug(
+                "Blue Iris alertlist response data dict did not contain alerts/items/records list. Keys: %s",
+                list(data),
+            )
+            return []
+
+        _LOGGER.debug(
+            "Blue Iris alertlist response did not include a usable data list/dict. Response keys: %s",
+            list(resp),
+        )
         return []
 
     @staticmethod
@@ -565,6 +582,11 @@ class BlueIrisApi:
         )
 
         if not records:
+            _LOGGER.debug(
+                "No Blue Iris alert records found for %s in the last %s seconds",
+                camera_id,
+                ALERTLIST_LOOKBACK_SECONDS,
+            )
             return None
 
         return max(
@@ -615,9 +637,8 @@ class BlueIrisApi:
 
                     if resp.status in (404, 410):
                         _LOGGER.debug(
-                            "Blue Iris alert image not found for ref=%s url=%s: HTTP %s",
+                            "Blue Iris alert image not found for ref=%s: HTTP %s",
                             alert_ref,
-                            url,
                             resp.status,
                         )
                         return None
@@ -669,6 +690,11 @@ class BlueIrisApi:
 
         alert_refs = self._alert_image_refs_from_record(record)
         if not alert_refs:
+            _LOGGER.debug(
+                "Latest Blue Iris alert for %s did not include a usable image reference: %s",
+                camera_id,
+                record,
+            )
             return None, record, None
 
         for alert_ref in alert_refs:
