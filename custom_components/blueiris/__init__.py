@@ -11,7 +11,7 @@ import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.util import dt as dt_util
@@ -323,8 +323,22 @@ async def _async_handle_latest_motion_event_snapshot(
     )
 
     if image is None:
-        raise ServiceValidationError(
-            f"Unable to fetch latest Blue Iris alert image for {entity_id}"
+        if alert_record is None:
+            raise HomeAssistantError(
+                f"No Blue Iris alerts found for {entity_id}. "
+                "Make sure the camera has an alert in Blue Iris within the last 24 hours, "
+                "then trigger a new alert and try again."
+            )
+
+        if alert_ref is None:
+            raise HomeAssistantError(
+                f"Latest Blue Iris alert for {entity_id} did not include an image reference. "
+                "Check the camera's Blue Iris alert/JPEG settings."
+            )
+
+        raise HomeAssistantError(
+            f"Blue Iris returned an alert for {entity_id}, but the alert image could not be fetched "
+            f"using ref {alert_ref!r}. Check Blue Iris alert/JPEG settings and debug logs."
         )
 
     path, local_url = await _save_snapshot_image(hass, image, filename)
