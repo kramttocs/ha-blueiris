@@ -9,7 +9,7 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import selector
@@ -80,6 +80,25 @@ USER_STEP_SCHEMA = vol.Schema(
         ),
     }
 )
+
+def _reconfigure_schema(entry: ConfigEntry) -> vol.Schema:
+    """Build schema for editing connection credentials."""
+    return vol.Schema(
+        {
+            vol.Optional(
+                CONF_USERNAME,
+                default=str(entry.data.get(CONF_USERNAME, "")),
+            ): selector.TextSelector(
+                selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT)
+            ),
+            vol.Optional(
+                CONF_PASSWORD,
+                default=str(entry.data.get(CONF_PASSWORD, "")),
+            ): selector.TextSelector(
+                selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+            ),
+        }
+    )
 
 
 def _is_filtered_camera(cam) -> bool:
@@ -242,6 +261,35 @@ def _dedupe_normalize_label_list(items: list[str] | None) -> list[str]:
     return out
 
 
+async def _async_validate_connection(
+    hass: HomeAssistant,
+    data: dict[str, Any],
+    options: dict[str, Any] | None = None,
+) -> None:
+    """Validate Blue Iris connection details."""
+    options = options or {}
+
+    cfg = BlueIrisConfig(
+        host=str(data.get(CONF_HOST, "")).strip(),
+        port=cv.port(data.get(CONF_PORT, DEFAULT_PORT)),
+        ssl=bool(data.get(CONF_SSL, False)),
+        verify_ssl=bool(data.get(CONF_VERIFY_SSL, True)),
+        username=str(data.get(CONF_USERNAME, "")),
+        password=str(data.get(CONF_PASSWORD, "")),
+        stream_type=str(options.get(CONF_STREAM_TYPE, DEFAULT_STREAM_TYPE)),
+    )
+
+    api = BlueIrisApi(hass, cfg)
+
+    try:
+        await api.async_update()
+    finally:
+        try:
+            await api.async_close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def _ai_label_selector() -> selector.SelectSelector:
     """Multi-select with custom values (chip/dropdown style)."""
     return selector.SelectSelector(
@@ -321,6 +369,46 @@ class BlueIrisConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     pass
 
         return self.async_show_form(step_id="user", data_schema=USER_STEP_SCHEMA, errors=errors)
+
+    async def async_step_reconfigure(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ) -> FlowResult:
+        """Allow the user to update Blue Iris credentials."""
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            new_data = {
+                **entry.data,
+                CONF_USERNAME: str(user_input.get(CONF_USERNAME, "")),
+                CONF_PASSWORD: str(user_input.get(CONF_PASSWORD, "")),
+            }
+
+            try:
+                await _async_validate_connection(
+                    self.hass,
+                    new_data,
+                    dict(entry.options),
+                )
+            except Exception:
+                _LOGGER.exception("Failed to connect to Blue Iris during reconfigure")
+                errors["base"] = "cannot_connect"
+            else:
+                if entry.unique_id is not None:
+                    await self.async_set_unique_id(entry.unique_id)
+                    self._abort_if_unique_id_mismatch()
+
+                return self.async_update_and_abort(
+                    entry,
+                    data=new_data,
+                )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=_reconfigure_schema(entry),
+            errors=errors,
+        )
 
     async def async_step_select(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Second step: general selectors during initial setup (no AI label mapping here)."""
