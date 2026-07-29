@@ -38,6 +38,14 @@
           "ai_vehicle_labels": "Vehicle labels",
           "ai_animal_labels": "Animal labels"
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Blue Iris",
+        "description": "Update the username and password used to connect to Blue Iris. Host, port, and SSL settings are unchanged.",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
       }
     },
     "error": {
@@ -45,6 +53,10 @@
       "cannot_connect": "Cannot connect.",
       "invalid_auth": "Invalid authentication.",
       "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "Blue Iris is already configured.",
+      "reconfigure_successful": "Blue Iris configuration updated."
     }
   },
   "options": {
