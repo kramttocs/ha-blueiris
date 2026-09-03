@@ -210,6 +210,7 @@ class BlueIrisCameraBinarySensor(_BaseBIBinarySensor):
             self.camera_id,
             name=f"{base} {cam.name if cam else self.camera_id}",
             model=model,
+            server_device_id=self.coordinator.server_device_id,
         )
 
     @property

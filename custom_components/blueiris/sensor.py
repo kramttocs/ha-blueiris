@@ -160,6 +160,7 @@ class BlueIrisCameraLastMotionEventSensor(CoordinatorEntity[BlueIrisData], Senso
             self.camera_id,
             name=f"{base_name(self.coordinator)} {cam.name if cam else self.camera_id}",
             model=camera_model(cam.type if cam else None),
+            server_device_id=self.coordinator.server_device_id,
         )
 
     @property

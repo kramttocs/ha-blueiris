@@ -1,7 +1,7 @@
 """DeviceInfo helpers shared across platforms.
 
 These helpers centralize DeviceInfo construction to avoid drift across platforms.
-They are intentionally minimal and preserve existing identifiers/via_device patterns.
+They are intentionally minimal and preserve existing device identifiers.
 """
 
 from __future__ import annotations
@@ -43,20 +43,26 @@ def camera_device_info(
     *,
     name: str,
     model: str,
+    server_device_id: str | None,
     manufacturer: str = "Blue Iris",
 ) -> DeviceInfo:
     """Return DeviceInfo for a camera, linked via the server/system device."""
-    return DeviceInfo(
+    device_info = DeviceInfo(
         identifiers={(DOMAIN, f"{entry_id}_cam_{camera_id}")},
         name=name,
         manufacturer=manufacturer,
         model=model,
-        via_device=(DOMAIN, f"{entry_id}_server"),
     )
+
+    if server_device_id is not None:
+        device_info["via_device_id"] = server_device_id
+
+    return device_info
 
 
 def camera_model(camera_type: object) -> str:
     """Map a Blue Iris camera type code to a friendly device model string."""
     if isinstance(camera_type, int):
         return CAMERA_TYPE_MAPPING.get(camera_type, "Camera")
+
     return "Camera"
