@@ -96,6 +96,7 @@ class BlueIrisCamera(CoordinatorEntity[BlueIrisData], Camera):
             self.camera_id,
             name=self._camera_name,
             model=model,
+            server_device_id=self.coordinator.server_device_id,
         )
 
     @callback
@@ -145,7 +146,7 @@ class BlueIrisCamera(CoordinatorEntity[BlueIrisData], Camera):
         session = data.session_id
         url = f"{base}/{stream_name}/{self.camera_id}/{file_name}"
         if session:
-            url = f"{url}?session={session}"         
+            url = f"{url}?session={session}"
         return url    
 
     async def async_camera_image(

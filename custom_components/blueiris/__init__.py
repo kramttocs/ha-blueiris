@@ -124,17 +124,17 @@ def _normalize_system_name(value: object) -> str | None:
     return None
 
 
-async def _ensure_server_device(
+def _ensure_server_device(
     hass: HomeAssistant,
     entry: ConfigEntry,
     coordinator: BlueIrisDataUpdateCoordinator,
-) -> None:
-    """Ensure a "server" device exists for linking entities via_device."""
+) -> str:
+    """Ensure a server device exists for linking child camera devices."""
     device_reg = dr.async_get(hass)
 
     version = coordinator.data.server_version if coordinator.data else None
 
-    device_reg.async_get_or_create(
+    device = device_reg.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, f"{entry.entry_id}_server")},
         name=server_device_name(coordinator),
@@ -142,6 +142,8 @@ async def _ensure_server_device(
         model="Server",
         sw_version=version,
     )
+
+    return device.id
 
 
 async def _async_handle_reload(hass: HomeAssistant, call: ServiceCall) -> None:
@@ -532,7 +534,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.config_entries.async_update_entry(entry, title=system_name)
 
     # Ensure the system device exists even if no switch entities are created.
-    await _ensure_server_device(hass, entry, coordinator)
+    coordinator.server_device_id = _ensure_server_device(
+        hass,
+        entry,
+        coordinator,
+    )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True

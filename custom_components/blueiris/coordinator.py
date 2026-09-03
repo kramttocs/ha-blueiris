@@ -213,6 +213,7 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
 
         self._config = self._config_from_entry(entry)
         self.api = BlueIrisApi(hass, self._config)
+        self.server_device_id: str | None = None
 
         self._mqtt: dict[str, MqttEventState] = {}
         self._last_motion_events: dict[str, CameraLastMotionEvent] = {}
