@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import logging
 from typing import Any, Final
 
 from homeassistant.components.camera import Camera, CameraEntityFeature
@@ -21,6 +23,7 @@ from .helpers.const import (
     DEFAULT_STREAM_TYPE,
 )
 
+_LOGGER = logging.getLogger(__name__)
 ALLOWED_COMPLEX_KEYS: Final[set[str]] = {"group", "rects"}
 
 
@@ -99,6 +102,28 @@ class BlueIrisCamera(CoordinatorEntity[BlueIrisData], Camera):
             server_device_id=self.coordinator.server_device_id,
         )
 
+    def _stream_source_url(self) -> str | None:
+        """Build the current Blue Iris stream URL."""
+        cfg = self.coordinator.api.config
+        stream_config = STREAM_VIDEO.get(
+            getattr(cfg, "stream_type", None),
+            STREAM_VIDEO[DEFAULT_STREAM_TYPE],
+        )
+
+        stream_name = stream_config.get("stream_name", "h264")
+        file_name = stream_config.get("file_name", "")
+
+        data = self.coordinator.data
+        if not data:
+            return None
+
+        url = f"{data.base_url}/{stream_name}/{self.camera_id}/{file_name}"
+
+        if data.session_id:
+            url = f"{url}?session={data.session_id}"
+
+        return url
+    
     @callback
     def _handle_coordinator_update(self) -> None:
         """Refresh extra state attributes from the latest coordinator snapshot."""
@@ -127,27 +152,34 @@ class BlueIrisCamera(CoordinatorEntity[BlueIrisData], Camera):
             if event.stored_path is not None:
                 attrs["last_snapshot_path"] = event.stored_path
 
+        new_source = self._stream_source_url()
+
+        if (
+            self.stream is not None
+            and new_source is not None
+            and self.stream.source != new_source
+        ):
+            data = self.coordinator.data
+            session_fp = (
+                hashlib.sha256(data.session_id.encode("utf-8")).hexdigest()[:8]
+                if data and data.session_id
+                else "none"
+            )
+
+            _LOGGER.debug(
+                "Updating Blue Iris stream source for %s after source changed "
+                "(session_fp=%s)",
+                self.camera_id,
+                session_fp,
+            )
+            self.stream.update_source(new_source)
+
         self._attr_extra_state_attributes = attrs
         super()._handle_coordinator_update()
 
     async def stream_source(self) -> str | None:
-        """Build the stream URL that Home Assistant should use for this camera."""
-        cfg = self.coordinator.api.config
-        stream_config = STREAM_VIDEO.get(
-            getattr(cfg, "stream_type", None),
-            STREAM_VIDEO[DEFAULT_STREAM_TYPE],
-        )
-        stream_name = stream_config.get("stream_name", "h264")
-        file_name = stream_config.get("file_name", "")
-        data = self.coordinator.data
-        if not data:
-            return None
-        base = data.base_url
-        session = data.session_id
-        url = f"{base}/{stream_name}/{self.camera_id}/{file_name}"
-        if session:
-            url = f"{url}?session={session}"
-        return url    
+        """Return the current Blue Iris stream URL."""
+        return self._stream_source_url()
 
     async def async_camera_image(
         self,
