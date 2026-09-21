@@ -453,10 +453,24 @@ class BlueIrisApi:
                         continue
 
                     if resp.status in (502, 503, 504):
+                        session_fingerprint = (
+                            hashlib.sha256(
+                                self.session_id.encode("utf-8")
+                            ).hexdigest()[:8]
+                            if self.session_id
+                            else "none"
+                        )
+
                         _LOGGER.debug(
-                            "Transient camera image error (%s) for %s; returning None.",
+                            "Transient camera image error: status=%s reason=%r "
+                            "camera=%s has_session=%s session_fp=%s "
+                            "retry_after=%r; returning None.",
                             resp.status,
+                            resp.reason,
                             camera_id,
+                            self.session_id is not None,
+                            session_fingerprint,
+                            resp.headers.get("Retry-After"),
                         )
                         return None
 
