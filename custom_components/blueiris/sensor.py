@@ -5,10 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+)
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import BlueIrisData, BlueIrisDataUpdateCoordinator, CameraLastMotionEvent
@@ -28,6 +34,16 @@ CONNECTION_HEALTH_DESCRIPTION = BlueIrisSensorEntityDescription(
     icon="mdi:heart-pulse",
 )
 
+UPTIME_DESCRIPTION = BlueIrisSensorEntityDescription(
+    key="uptime",
+    name="Uptime",
+    device_class=SensorDeviceClass.DURATION,
+    native_unit_of_measurement=UnitOfTime.SECONDS,
+    suggested_unit_of_measurement=UnitOfTime.HOURS,
+    icon="mdi:timer-outline",
+    entity_category=EntityCategory.DIAGNOSTIC,
+)
+
 LAST_MOTION_EVENT_DESCRIPTION = BlueIrisSensorEntityDescription(
     key="last_motion_event",
     name="Last Motion Event",
@@ -41,6 +57,26 @@ def _motion_sensor_enabled(coordinator: BlueIrisDataUpdateCoordinator, camera_id
     return is_allowed(allowed, camera_id)
 
 
+def _parse_uptime(value: str) -> int | None:
+    """Convert Blue Iris D:HH:MM:SS uptime to seconds."""
+    parts = value.split(":")
+
+    if len(parts) != 4:
+        return None
+
+    try:
+        days, hours, minutes, seconds = map(int, parts)
+    except ValueError:
+        return None
+
+    return (
+        days * 86400
+        + hours * 3600
+        + minutes * 60
+        + seconds
+    )
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -48,7 +84,10 @@ async def async_setup_entry(
 ) -> None:
     """Create server-level and per-camera sensors for the config entry."""
     coordinator: BlueIrisDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
-    entities: list[SensorEntity] = [BlueIrisConnectionHealthSensor(coordinator, entry)]
+    entities: list[SensorEntity] = [
+        BlueIrisConnectionHealthSensor(coordinator, entry),
+        BlueIrisServerUptimeSensor(coordinator, entry),
+    ]
 
     if coordinator.data is not None:
         for cam_id, cam in coordinator.data.cameras.items():
@@ -125,6 +164,52 @@ class BlueIrisConnectionHealthSensor(
             "profile": status.get("profile"),
             "schedule": status.get("schedule"),
         }
+
+
+class BlueIrisServerUptimeSensor(
+    CoordinatorEntity[BlueIrisData],
+    SensorEntity,
+):
+    """Reports Blue Iris software uptime."""
+
+    entity_description = UPTIME_DESCRIPTION
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: BlueIrisDataUpdateCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialize the Blue Iris uptime sensor."""
+        super().__init__(coordinator)
+        self._entry = entry
+        self._attr_unique_id = f"{entry.entry_id}_uptime"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Attach this sensor under the integration server device."""
+        data = self.coordinator.data
+        system_name = data.system_name if data else None
+        name = (system_name or self._entry.title or "BlueIris").strip()
+
+        return server_device_info(
+            self._entry.entry_id,
+            name=f"{name} Server",
+            sw_version=(data.server_version if data else None),
+        )
+
+    @property
+    def native_value(self) -> int | None:
+        """Return Blue Iris software uptime in seconds."""
+        data = self.coordinator.data
+        if not data:
+            return None
+
+        uptime = data.status.get("uptime")
+        if not uptime:
+            return None
+
+        return _parse_uptime(str(uptime))
 
 
 class BlueIrisCameraLastMotionEventSensor(CoordinatorEntity[BlueIrisData], SensorEntity):
