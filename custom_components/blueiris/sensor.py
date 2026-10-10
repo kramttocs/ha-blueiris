@@ -21,6 +21,7 @@ from .coordinator import BlueIrisData, BlueIrisDataUpdateCoordinator, CameraLast
 from .helpers.const import DOMAIN, SENSOR_MOTION_NAME
 from .helpers.device import camera_device_info, camera_model, server_device_info
 from .helpers.entity import base_name, is_allowed
+from .helpers.status import parse_uptime
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -55,26 +56,6 @@ def _motion_sensor_enabled(coordinator: BlueIrisDataUpdateCoordinator, camera_id
     """Return True when the camera's Motion sensor is allowed/created."""
     allowed = coordinator.api.config.allowed_motion_sensor
     return is_allowed(allowed, camera_id)
-
-
-def _parse_uptime(value: str) -> int | None:
-    """Convert Blue Iris D:HH:MM:SS uptime to seconds."""
-    parts = value.split(":")
-
-    if len(parts) != 4:
-        return None
-
-    try:
-        days, hours, minutes, seconds = map(int, parts)
-    except ValueError:
-        return None
-
-    return (
-        days * 86400
-        + hours * 3600
-        + minutes * 60
-        + seconds
-    )
 
 
 async def async_setup_entry(
@@ -209,7 +190,7 @@ class BlueIrisServerUptimeSensor(
         if not uptime:
             return None
 
-        return _parse_uptime(str(uptime))
+        return parse_uptime(str(uptime))
 
 
 class BlueIrisCameraLastMotionEventSensor(CoordinatorEntity[BlueIrisData], SensorEntity):

@@ -353,6 +353,12 @@ class BlueIrisApi:
                 system_name = None
             self.system_name = system_name
 
+    async def refresh_login(self) -> None:
+        """Force a fresh Blue Iris login and refresh login metadata."""
+        self.is_logged_in = False
+        self.session_id = None
+        await self.login()
+
     async def verified_post(self, payload: dict[str, Any]) -> dict[str, Any]:
         """POST a command, retrying once after re-authentication if the session is stale."""
         payload = dict(payload)

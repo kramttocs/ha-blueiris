@@ -65,6 +65,7 @@ from .helpers.const import (
 )
 from .models.camera_data import CameraData
 from .helpers.mqtt import mqtt_key, parse_topic, subscription_topic
+from .helpers.status import parse_uptime
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -237,6 +238,7 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
         self.consecutive_failures: int = 0
         self.auth_failures: int = 0
         self.last_success_time: datetime | None = None
+        self._last_server_uptime_seconds: int | None = None
 
         # Ensure we refresh camlist on the very first update.
         self._last_camlist_refresh = dt_util.utcnow() - CAMLIST_REFRESH_INTERVAL - timedelta(seconds=1)
@@ -792,15 +794,55 @@ class BlueIrisDataUpdateCoordinator(DataUpdateCoordinator[BlueIrisData]):
     async def _async_update_data(self) -> BlueIrisData:
         """Fetch data from Blue Iris."""
         try:
+            session_before_status = self.api.session_id
+
             try:
                 status = await self.api.fetch_status()
+
             except Exception as err:
                 _LOGGER.warning("Blue Iris status fetch failed (%r); retrying once...", err)
                 await asyncio.sleep(0.5)
+
                 try:
                     status = await self.api.fetch_status()
                 except Exception as err2:
                     raise UpdateFailed(f"Blue Iris status fetch failed after retry: {err2}") from err2
+
+            uptime_value = status.get("uptime") if isinstance(status, dict) else None
+            current_uptime_seconds = (
+                parse_uptime(str(uptime_value))
+                if uptime_value is not None
+                else None
+            )
+
+            server_restarted = (
+                current_uptime_seconds is not None
+                and self._last_server_uptime_seconds is not None
+                and current_uptime_seconds < self._last_server_uptime_seconds
+            )
+
+            if server_restarted:
+                _LOGGER.info(
+                    "Blue Iris software restart detected from uptime reset "
+                    "(previous=%s seconds, current=%s seconds)",
+                    self._last_server_uptime_seconds,
+                    current_uptime_seconds,
+                )
+
+                if self.api.session_id == session_before_status:
+                    _LOGGER.info(
+                        "Blue Iris session did not change after restart; "
+                        "refreshing login metadata."
+                    )
+                    await self.api.refresh_login()
+                else:
+                    _LOGGER.debug(
+                        "Blue Iris session changed during status refresh; "
+                        "login metadata is already fresh."
+                    )
+
+            if current_uptime_seconds is not None:
+                self._last_server_uptime_seconds = current_uptime_seconds
 
             await self._ensure_mqtt_subscription()
 
