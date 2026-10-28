@@ -340,24 +340,35 @@ class BlueIrisConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
             api = BlueIrisApi(self.hass, cfg)
             try:
-                await api.async_update()
-                api_data = api.data or {}
-                self._cached_lists = _build_cached_lists(
-                    list(api.camera_list),
-                    list(api_data.get("profiles", []) or []),
-                    list(api_data.get("schedules", []) or []),
-                )
+                await api.fetch_status()
 
-                self._data = {
-                    CONF_HOST: host,
-                    CONF_PORT: port,
-                    CONF_SSL: ssl,
-                    CONF_VERIFY_SSL: cfg.verify_ssl,
-                    CONF_USERNAME: cfg.username,
-                    CONF_PASSWORD: cfg.password,
-                }
+                try:
+                    cameras = await api.fetch_camlist()
+                except Exception:
+                    _LOGGER.warning(
+                        "Connected to Blue Iris, but camera data could not "
+                        "be retrieved during setup",
+                        exc_info=True,
+                    )
+                    errors["base"] = "camera_fetch_failed"
+                else:
+                    api_data = api.data or {}
+                    self._cached_lists = _build_cached_lists(
+                        cameras,
+                        list(api_data.get("profiles", []) or []),
+                        list(api_data.get("schedules", []) or []),
+                    )
 
-                return await self.async_step_select()
+                    self._data = {
+                        CONF_HOST: host,
+                        CONF_PORT: port,
+                        CONF_SSL: ssl,
+                        CONF_VERIFY_SSL: cfg.verify_ssl,
+                        CONF_USERNAME: cfg.username,
+                        CONF_PASSWORD: cfg.password,
+                    }
+
+                    return await self.async_step_select()
 
             except Exception:
                 _LOGGER.exception("Failed to connect to Blue Iris during config flow")
@@ -424,6 +435,18 @@ class BlueIrisConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if allowed_motion:
                 return await self.async_step_ai_labels_setup()
 
+            camera_option_keys = (
+                CONF_ALLOWED_CAMERA,
+                CONF_ALLOWED_MOTION_SENSOR,
+                CONF_ALLOWED_AUDIO_SENSOR,
+                CONF_ALLOWED_CONNECTIVITY_SENSOR,
+                CONF_ALLOWED_DIO_SENSOR,
+                CONF_ALLOWED_EXTERNAL_SENSOR,
+            )
+
+            if not any(self._pending_options.get(key) for key in camera_option_keys):
+                return await self.async_step_server_only()
+
             title = DEFAULT_NAME
             return self.async_create_entry(title=title, data=self._data, options=self._pending_options)
 
@@ -484,6 +507,23 @@ class BlueIrisConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
         return self.async_show_form(step_id="select", data_schema=schema, errors=errors)
 
+    async def async_step_server_only(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ) -> FlowResult:
+        """Confirm an intentionally server-only configuration."""
+        if user_input is not None:
+            return self.async_create_entry(
+                title=DEFAULT_NAME,
+                data=self._data,
+                options=self._pending_options,
+            )
+
+        return self.async_show_form(
+            step_id="server_only",
+            data_schema=vol.Schema({}),
+        )
+    
     async def async_step_ai_labels_setup(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Setup-time AI Label Mapping (shown only when motion sensors selected)."""
         errors: dict[str, str] = {}
