@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from typing import Any, Final
+from urllib.parse import urlencode
 
 from homeassistant.components.camera import Camera, CameraEntityFeature
 from homeassistant.config_entries import ConfigEntry
@@ -119,8 +120,16 @@ class BlueIrisCamera(CoordinatorEntity[BlueIrisData], Camera):
 
         url = f"{data.base_url}/{stream_name}/{self.camera_id}/{file_name}"
 
+        params: dict[str, str] = {}
         if data.session_id:
-            url = f"{url}?session={data.session_id}"
+            params["session"] = data.session_id
+
+        cam = self._camera
+        if cam and cam.has_audio:
+            params["audio"] = "1"
+
+        if params:
+            url = f"{url}?{urlencode(params)}"
 
         return url
     
