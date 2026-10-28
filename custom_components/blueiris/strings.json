@@ -30,6 +30,10 @@
           "allowed_external_sensor": "External sensors"
         }
       },
+      "server_only": {
+        "title": "Server-only configuration",
+        "description": "No cameras or camera-related sensors are selected. Only server-level entities will be created. You can enable cameras later in the integration options. Continue?"
+      },
       "ai_labels_setup": {
         "title": "AI Label Mapping",
         "description": "{help}",
@@ -51,6 +55,7 @@
     "error": {
       "already_configured": "Blue Iris is already configured.",
       "cannot_connect": "Cannot connect.",
+      "camera_fetch_failed": "Connected to Blue Iris, but camera data could not be retrieved. Check the Blue Iris logs and try again.",
       "invalid_auth": "Invalid authentication.",
       "unknown": "Unexpected error."
     },

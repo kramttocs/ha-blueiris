@@ -20,6 +20,8 @@ from .helpers.const import (
     DOMAIN,
     DOMAIN_STREAM,
     STREAM_VIDEO,
+    STREAM_TYPE_H264,
+    STREAM_TYPE_H264_TS,
     DEFAULT_CONTENT_TYPE,
     DEFAULT_STREAM_TYPE,
 )
@@ -125,7 +127,11 @@ class BlueIrisCamera(CoordinatorEntity[BlueIrisData], Camera):
             params["session"] = data.session_id
 
         cam = self._camera
-        if cam and cam.has_audio:
+        if (
+            cam is not None
+            and cam.has_audio
+            and cfg.stream_type in (STREAM_TYPE_H264, STREAM_TYPE_H264_TS)
+        ):
             params["audio"] = "1"
 
         if params:
