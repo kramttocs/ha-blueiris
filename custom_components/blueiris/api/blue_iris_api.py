@@ -389,7 +389,8 @@ class BlueIrisApi:
             self.session_id is not None,
         )
 
-        auth_fail = self._is_auth_failure(reason_l)
+        challenge = not reason_l and isinstance(result.get("session"), str)
+        auth_fail = self._is_auth_failure(reason_l) or challenge
         if not auth_fail:
             raise RuntimeError(f"Blue Iris request failed for cmd={cmd} reason={raw_reason!r}")
 
