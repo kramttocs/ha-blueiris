@@ -262,7 +262,7 @@ class BlueIrisCameraLastMotionEventSensor(CoordinatorEntity[BlueIrisData], Senso
     def extra_state_attributes(self) -> dict[str, Any]:
         event = self._event
         if event is None:
-            return {"camera_id": self.camera_id}
+            return {"camera_id": self.camera_id, "last_detection": None}
 
         return {
             "camera_id": self.camera_id,
